@@ -1,11 +1,11 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth, { DefaultSession } from "next-auth";
+import NextAuth, { DefaultSession, AuthError } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import dbConnect from "@/lib/db";
 import User from "@/schemas/User";
 import bcrypt from "bcryptjs";
+import { NextApiRequest, NextApiResponse } from "next";
 
-// Extend the built-in session types
 declare module "next-auth" {
   interface Session {
     user: {
@@ -19,7 +19,6 @@ declare module "next-auth" {
   }
 }
 
-// Extend the built-in JWT types
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
@@ -37,35 +36,34 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          console.log("Missing credentials");
-          return null;
-        }
-
         try {
-          await dbConnect();
-          console.log("Database connected for login");
-
-          // Find user by email
-          const user = await User.findOne({ email: credentials.email });
-
-          if (!user) {
-            console.log("User not found in database");
-            return null;
+          if (!credentials?.email || !credentials?.password) {
+            throw new AuthError("Email and password are required");
           }
 
-          // Check password
+          await dbConnect();
+
+          const user = await User.findOne({
+            email: credentials.email.toLowerCase(),
+          }).select("+password");
+
+          if (!user) {
+            throw new AuthError("User not found");
+          }
+
+          if (!user.password) {
+            throw new AuthError("No password set for user");
+          }
+
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
             user.password
           );
 
           if (!isPasswordValid) {
-            console.log("Invalid password");
-            return null;
+            throw new AuthError("Invalid password");
           }
 
-          // Return user object with the correct structure
           return {
             id: user._id.toString(),
             email: user.email,
@@ -74,15 +72,17 @@ const handler = NextAuth({
             image: user.avatar_url || "",
           };
         } catch (error) {
-          console.error("Authorization error:", error);
-          return null;
+          console.error("Authentication error:", error);
+          if (error instanceof AuthError) {
+            throw error;
+          }
+          throw new AuthError("Authentication failed");
         }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // When the user is first authenticated, add additional data to the token
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -90,7 +90,6 @@ const handler = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      // Add the token data to the session
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;
@@ -99,13 +98,16 @@ const handler = NextAuth({
     },
   },
   session: {
-    strategy: "jwt" as const,
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   pages: {
     signIn: "/login",
-    // signUp: "/register",
+    error: "/login?error=auth",
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 });
 
 export { handler as GET, handler as POST };

@@ -1,16 +1,17 @@
+// app/dashboard/user/page.tsx
 "use client";
-
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "@/lib/store";
+import { AppDispatch, RootState } from "@/redux/store";
 import {
-  fetchJobs,
+  fetchUserJobs,
   fetchUserApplications,
   fetchSavedJobs,
   saveJob,
   unsaveJob,
   applyToJob,
 } from "@/redux/slices/job-slice";
+import { useSession } from "next-auth/react";
 import {
   Card,
   CardContent,
@@ -21,78 +22,68 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Users,
   Briefcase,
-  Bookmark,
-  Search,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Settings,
+  BarChart3,
+  Activity,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Calendar,
   MapPin,
-  Clock,
   DollarSign,
-  Filter,
+  Bookmark,
+  BookmarkOff,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { useAuth } from "@/hooks/use-auth";
+import Link from "next/link";
 
 export default function UserDashboard() {
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useAuth();
-  const { jobs, applications, savedJobs, isLoading } = useSelector(
+  const { data: session } = useSession();
+  const { userJobs, userApplications, savedJobs, isLoading } = useSelector(
     (state: RootState) => state.jobs
   );
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [jobTypeFilter, setJobTypeFilter] = useState("");
-  const [activeTab, setActiveTab] = useState("recommended");
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
-    dispatch(fetchJobs());
-    dispatch(fetchUserApplications());
-    dispatch(fetchSavedJobs());
-  }, [dispatch]);
+    if (session?.user?.id) {
+      dispatch(fetchUserJobs());
+      dispatch(fetchUserApplications(session.user.id));
+      dispatch(fetchSavedJobs(session.user.id));
+    }
+  }, [dispatch, session]);
 
-  // Filter jobs based on search and filters
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLocation =
-      !locationFilter ||
-      job.location.toLowerCase().includes(locationFilter.toLowerCase());
-    const matchesType = !jobTypeFilter || job.type === jobTypeFilter;
+  // Calculate stats from actual data
+  const totalApplications = userApplications?.length || 0;
+  const pendingApplications =
+    userApplications?.filter((app) => app.status === "pending").length || 0;
+  const savedJobsCount = savedJobs?.length || 0;
 
-    return matchesSearch && matchesLocation && matchesType;
-  });
-
-  const handleSaveJob = (jobId: string) => {
-    const isSaved = savedJobs.some((job) => job.id === jobId);
-    if (isSaved) {
-      dispatch(unsaveJob(jobId));
-    } else {
-      dispatch(saveJob(jobId));
+  const handleSaveJob = async (jobId: string) => {
+    if (session?.user?.id) {
+      await dispatch(saveJob({ userId: session.user.id, jobId }));
     }
   };
 
-  const handleApplyJob = (jobId: string) => {
-    dispatch(applyToJob({ jobId }));
+  const handleUnsaveJob = async (jobId: string) => {
+    if (session?.user?.id) {
+      await dispatch(unsaveJob({ userId: session.user.id, jobId }));
+    }
   };
 
-  const isJobSaved = (jobId: string) => {
-    return savedJobs.some((job) => job.id === jobId);
-  };
-
-  const isJobApplied = (jobId: string) => {
-    return applications.some((app) => app.job_id === jobId);
+  const handleApplyToJob = async (jobId: string, coverLetter?: string) => {
+    if (session?.user?.id) {
+      await dispatch(
+        applyToJob({ userId: session.user.id, jobId, coverLetter })
+      );
+    }
   };
 
   if (isLoading) {
@@ -108,263 +99,346 @@ export default function UserDashboard() {
       {/* Welcome Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">
-            Welcome back, {user?.full_name}
-          </h1>
-          <p className="text-gray-600 mt-1">Find your dream job today</p>
+          <h1 className="text-3xl font-bold">Job Seeker Dashboard</h1>
+          <p className="text-gray-600 mt-1">
+            Find jobs and track your applications
+          </p>
         </div>
         <div className="flex items-center space-x-4">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={user?.avatar_url || ""} alt={user?.full_name} />
+            <AvatarImage
+              src={session?.user?.image || ""}
+              alt={session?.user?.name}
+            />
             <AvatarFallback>
-              {user?.full_name?.charAt(0).toUpperCase()}
+              {session?.user?.name?.charAt(0).toUpperCase() || "J"}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="font-medium">{user?.full_name}</p>
+            <p className="font-medium">{session?.user?.name || "Job Seeker"}</p>
             <p className="text-sm text-gray-500">Job Seeker</p>
           </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Applications</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Available Jobs
+            </CardTitle>
             <Briefcase className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{applications.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Total applications submitted
-            </p>
+            <div className="text-2xl font-bold">{userJobs?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Open positions</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saved Jobs</CardTitle>
-            <Bookmark className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Applications</CardTitle>
+            <FileText className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{savedJobs.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Jobs you saved for later
-            </p>
+            <div className="text-2xl font-bold">{totalApplications}</div>
+            <p className="text-xs text-muted-foreground">Total applications</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingApplications}</div>
+            <p className="text-xs text-muted-foreground">Need review</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-purple-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Profile Completion
-            </CardTitle>
-            <div className="h-4 w-4 rounded-full bg-purple-500"></div>
+            <CardTitle className="text-sm font-medium">Saved Jobs</CardTitle>
+            <Bookmark className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">75%</div>
-            <p className="text-xs text-muted-foreground">
-              Complete your profile
-            </p>
+            <div className="text-2xl font-bold">{savedJobsCount}</div>
+            <p className="text-xs text-muted-foreground">Bookmarked</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Job Search and Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Find Jobs</CardTitle>
-          <CardDescription>Search and filter job opportunities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search jobs..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Location"
-                className="pl-10"
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-              />
-            </div>
-            <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Job Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
-                <SelectItem value="full-time">Full-time</SelectItem>
-                <SelectItem value="part-time">Part-time</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="internship">Internship</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              More Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Job Listings */}
+      {/* Main Content Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
         className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="recommended">Recommended</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="jobs">Find Jobs</TabsTrigger>
+          <TabsTrigger value="applications">My Applications</TabsTrigger>
           <TabsTrigger value="saved">Saved Jobs</TabsTrigger>
-          <TabsTrigger value="applied">Applied</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="recommended" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredJobs.slice(0, 6).map((job) => (
-              <Card key={job.id} className="flex flex-col h-full">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{job.title}</CardTitle>
-                      <CardDescription className="text-base font-medium">
-                        {job.company}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSaveJob(job.id)}
-                      className="p-1 h-8 w-8"
-                    >
-                      <Bookmark
-                        className={`h-4 w-4 ${
-                          isJobSaved(job.id)
-                            ? "fill-current text-green-500"
-                            : ""
-                        }`}
-                      />
-                    </Button>
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Application Stats
+                </CardTitle>
+                <CardDescription>
+                  Your application status breakdown
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span>Pending</span>
+                    <Badge variant="secondary">{pendingApplications}</Badge>
                   </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {job.location}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="h-4 w-4 mr-1" />
-                      {formatDistanceToNow(new Date(job.created_at), {
-                        addSuffix: true,
-                      })}
-                    </div>
-                    {job.salary && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        {job.salary}
-                      </div>
-                    )}
-                    <Badge variant="secondary" className="w-fit">
-                      {job.type}
+                  <div className="flex items-center justify-between">
+                    <span>Reviewed</span>
+                    <Badge variant="outline">
+                      {userApplications?.filter(
+                        (app) => app.status === "reviewed"
+                      ).length || 0}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                    {job.description}
-                  </p>
-                  <div className="mt-auto">
-                    <Button
-                      className="w-full"
-                      onClick={() => handleApplyJob(job.id)}
-                      disabled={isJobApplied(job.id)}
-                    >
-                      {isJobApplied(job.id) ? "Already Applied" : "Apply Now"}
-                    </Button>
+                  <div className="flex items-center justify-between">
+                    <span>Accepted</span>
+                    <Badge variant="default">
+                      {userApplications?.filter(
+                        (app) => app.status === "accepted"
+                      ).length || 0}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <div className="flex items-center justify-between">
+                    <span>Rejected</span>
+                    <Badge variant="destructive">
+                      {userApplications?.filter(
+                        (app) => app.status === "rejected"
+                      ).length || 0}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Activity
+                </CardTitle>
+                <CardDescription>Your latest job applications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {userApplications?.slice(0, 3).map((application) => (
+                    <div
+                      key={application.id}
+                      className="flex items-start space-x-3"
+                    >
+                      {application.status === "pending" && (
+                        <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                      )}
+                      {application.status === "accepted" && (
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                      )}
+                      {application.status === "rejected" && (
+                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">
+                          Applied to {application.jobTitle}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {application.jobCompany} •{" "}
+                          {new Date(application.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recommended Jobs</CardTitle>
+              <CardDescription>Jobs that match your profile</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {userJobs?.slice(0, 3).map((job) => (
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium">{job.title}</p>
+                      <p className="text-sm text-gray-500">
+                        {job.company} • {job.location}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSaveJob(job.id)}
+                        disabled={savedJobs?.some(
+                          (savedJob) => savedJob.id === job.id
+                        )}
+                      >
+                        <Bookmark className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleApplyToJob(job.id)}
+                        disabled={userApplications?.some(
+                          (app) => app.jobId === job.id
+                        )}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="jobs" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Find Jobs</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                Filter
+              </Button>
+              <Button variant="outline" size="sm">
+                Sort
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Job Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Company
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Salary
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Posted
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {userJobs?.map((job) => {
+                    const isSaved = savedJobs?.some(
+                      (savedJob) => savedJob.id === job.id
+                    );
+                    const hasApplied = userApplications?.some(
+                      (app) => app.jobId === job.id
+                    );
+
+                    return (
+                      <tr key={job.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {job.title}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {job.company}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            {job.location}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge variant="outline">{job.type}</Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <DollarSign className="h-4 w-4 mr-1" />
+                            {job.salary}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(job.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                isSaved
+                                  ? handleUnsaveJob(job.id)
+                                  : handleSaveJob(job.id)
+                              }
+                            >
+                              {isSaved ? (
+                                <BookmarkOff className="h-4 w-4" />
+                              ) : (
+                                <Bookmark className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Link href={`/dashboard/user/jobs/${job.id}`}>
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApplyToJob(job.id)}
+                              disabled={hasApplied}
+                            >
+                              {hasApplied ? "Applied" : "Apply"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="saved" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedJobs.map((job) => (
-              <Card key={job.id} className="flex flex-col h-full">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{job.title}</CardTitle>
-                      <CardDescription className="text-base font-medium">
-                        {job.company}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSaveJob(job.id)}
-                      className="p-1 h-8 w-8"
-                    >
-                      <Bookmark className="h-4 w-4 fill-current text-green-500" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {job.location}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="h-4 w-4 mr-1" />
-                      {formatDistanceToNow(new Date(job.created_at), {
-                        addSuffix: true,
-                      })}
-                    </div>
-                    {job.salary && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        {job.salary}
-                      </div>
-                    )}
-                    <Badge variant="secondary" className="w-fit">
-                      {job.type}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                    {job.description}
-                  </p>
-                  <div className="mt-auto flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleSaveJob(job.id)}
-                    >
-                      Remove
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={() => handleApplyJob(job.id)}
-                      disabled={isJobApplied(job.id)}
-                    >
-                      {isJobApplied(job.id) ? "Applied" : "Apply"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <TabsContent value="applications" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">My Applications</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                Export CSV
+              </Button>
+            </div>
           </div>
-        </TabsContent>
 
-        <TabsContent value="applied" className="space-y-4">
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -377,30 +451,35 @@ export default function UserDashboard() {
                       Company
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date Applied
+                      Applied
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {applications.map((application) => (
+                  {userApplications?.map((application) => (
                     <tr key={application.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {application.job_title}
+                          {application.jobTitle}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {application.company}
+                        <div className="text-sm text-gray-500">
+                          {application.jobCompany}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDistanceToNow(new Date(application.created_at), {
-                          addSuffix: true,
-                        })}
+                        {application.jobCompany}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          {new Date(application.createdAt).toLocaleDateString()}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge
@@ -409,16 +488,139 @@ export default function UserDashboard() {
                               ? "secondary"
                               : application.status === "accepted"
                               ? "default"
-                              : application.status === "rejected"
-                              ? "destructive"
-                              : "outline"
+                              : "destructive"
                           }
                         >
                           {application.status}
                         </Badge>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex gap-2">
+                          <Link
+                            href={`/dashboard/user/applications/${application.id}`}
+                          >
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Link
+                            href={`/dashboard/user/messages/${application.recruiterId}`}
+                          >
+                            <Button variant="outline" size="sm">
+                              Message
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="saved" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Saved Jobs</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                Export CSV
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Job Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Company
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Salary
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Saved
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {savedJobs?.map((job) => {
+                    const hasApplied = userApplications?.some(
+                      (app) => app.jobId === job.id
+                    );
+
+                    return (
+                      <tr key={job.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {job.title}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {job.company}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {job.company}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            {job.location}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge variant="outline">{job.type}</Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <DollarSign className="h-4 w-4 mr-1" />
+                            {job.salary}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(job.savedAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUnsaveJob(job.id)}
+                            >
+                              <BookmarkOff className="h-4 w-4" />
+                            </Button>
+                            <Link href={`/dashboard/user/jobs/${job.id}`}>
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApplyToJob(job.id)}
+                              disabled={hasApplied}
+                            >
+                              {hasApplied ? "Applied" : "Apply"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

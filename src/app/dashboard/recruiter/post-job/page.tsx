@@ -1,18 +1,18 @@
+// app/dashboard/recruiter/post-job/page.tsx
 "use client";
-
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/redux/store";
+import { createJob } from "@/redux/slices/job-slice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -20,49 +20,64 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+
+const jobSchema = z.object({
+  title: z.string().min(1, "Job title is required"),
+  company: z.string().min(1, "Company name is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  location: z.string().min(1, "Location is required"),
+  type: z.enum(["full-time", "part-time", "contract", "internship"]),
+  salary: z.string().min(1, "Salary is required"),
+});
+
+type JobFormData = z.infer<typeof jobSchema>;
 
 export default function PostJobPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    title: "",
-    company: "",
-    location: "",
-    type: "",
-    salary: "",
-    description: "",
-    requirements: "",
-    benefits: "",
-    deadline: "",
-    experience: "",
-    education: "",
-    category: "",
+  const { data: session } = useSession();
+  const dispatch = useDispatch<AppDispatch>();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<JobFormData>({
+    resolver: zodResolver(jobSchema),
+    defaultValues: {
+      type: "full-time",
+    },
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Here you would typically submit the form data to your API
-    console.log("Job posting data:", formData);
-    alert("Job posted successfully!");
-    router.push("/dashboard/recruiter/jobs");
+  const onSubmit = async (data: JobFormData) => {
+    setIsSubmitting(true);
+    try {
+      await dispatch(createJob(data)).unwrap();
+      toast.success("Job posted successfully!");
+      router.push("/dashboard/recruiter");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to post job");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Post a New Job</h1>
-        <p className="text-gray-600">
-          Create a new job posting to attract candidates
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Post a New Job</h1>
+        <p className="text-gray-600 mt-2">
+          Fill in the details below to create a new job posting
         </p>
       </div>
 
@@ -70,153 +85,85 @@ export default function PostJobPage() {
         <CardHeader>
           <CardTitle>Job Details</CardTitle>
           <CardDescription>
-            Fill in the information about the job position
+            Provide information about the job position
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Job Title</Label>
                 <Input
                   id="title"
-                  name="title"
                   placeholder="e.g. Senior Frontend Developer"
-                  value={formData.title}
-                  onChange={handleChange}
-                  required
+                  {...register("title")}
                 />
+                {errors.title && (
+                  <p className="text-sm text-red-500">{errors.title.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
+                <Label htmlFor="company">Company Name</Label>
                 <Input
                   id="company"
-                  name="company"
-                  placeholder="e.g. Tech Innovations"
-                  value={formData.company}
-                  onChange={handleChange}
-                  required
+                  placeholder="e.g. Tech Corp"
+                  {...register("company")}
                 />
+                {errors.company && (
+                  <p className="text-sm text-red-500">
+                    {errors.company.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
                 <Input
                   id="location"
-                  name="location"
-                  placeholder="e.g. San Francisco, CA or Remote"
-                  value={formData.location}
-                  onChange={handleChange}
-                  required
+                  placeholder="e.g. San Francisco, CA"
+                  {...register("location")}
                 />
+                {errors.location && (
+                  <p className="text-sm text-red-500">
+                    {errors.location.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="salary">Salary</Label>
+                <Input
+                  id="salary"
+                  placeholder="e.g. $80,000 - $120,000"
+                  {...register("salary")}
+                />
+                {errors.salary && (
+                  <p className="text-sm text-red-500">
+                    {errors.salary.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="type">Job Type</Label>
                 <Select
-                  onValueChange={(value) => handleSelectChange("type", value)}
+                  value={watch("type")}
+                  onValueChange={(value) => setValue("type", value as any)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select job type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full-time">Full-time</SelectItem>
-                    <SelectItem value="part-time">Part-time</SelectItem>
+                    <SelectItem value="full-time">Full Time</SelectItem>
+                    <SelectItem value="part-time">Part Time</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="internship">Internship</SelectItem>
-                    <SelectItem value="freelance">Freelance</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary Range</Label>
-                <Input
-                  id="salary"
-                  name="salary"
-                  placeholder="e.g. $80,000 - $120,000"
-                  value={formData.salary}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="deadline">Application Deadline</Label>
-                <Input
-                  id="deadline"
-                  name="deadline"
-                  type="date"
-                  value={formData.deadline}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="experience">Experience Level</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleSelectChange("experience", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select experience level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="entry">Entry Level</SelectItem>
-                    <SelectItem value="mid">Mid Level</SelectItem>
-                    <SelectItem value="senior">Senior Level</SelectItem>
-                    <SelectItem value="executive">Executive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="education">Education Requirement</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleSelectChange("education", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select education level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high-school">High School</SelectItem>
-                    <SelectItem value="associate">Associate Degree</SelectItem>
-                    <SelectItem value="bachelor">
-                      Bachelor&apos;s Degree
-                    </SelectItem>
-                    <SelectItem value="master">Master&apos;s Degree</SelectItem>
-                    <SelectItem value="phd">PhD</SelectItem>
-                    <SelectItem value="any">Any</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Job Category</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleSelectChange("category", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="engineering">Engineering</SelectItem>
-                    <SelectItem value="design">Design</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="sales">Sales</SelectItem>
-                    <SelectItem value="customer-service">
-                      Customer Service
-                    </SelectItem>
-                    <SelectItem value="hr">Human Resources</SelectItem>
-                    <SelectItem value="finance">Finance</SelectItem>
-                    <SelectItem value="operations">Operations</SelectItem>
-                  </SelectContent>
-                </Select>
+                {errors.type && (
+                  <p className="text-sm text-red-500">{errors.type.message}</p>
+                )}
               </div>
             </div>
 
@@ -224,41 +171,18 @@ export default function PostJobPage() {
               <Label htmlFor="description">Job Description</Label>
               <Textarea
                 id="description"
-                name="description"
-                placeholder="Describe the role, responsibilities, and what the candidate will be doing..."
-                rows={5}
-                value={formData.description}
-                onChange={handleChange}
-                required
+                placeholder="Describe the job responsibilities, requirements, and benefits..."
+                rows={6}
+                {...register("description")}
               />
+              {errors.description && (
+                <p className="text-sm text-red-500">
+                  {errors.description.message}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="requirements">Requirements</Label>
-              <Textarea
-                id="requirements"
-                name="requirements"
-                placeholder="List the required skills, qualifications, and experience..."
-                rows={4}
-                value={formData.requirements}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="benefits">Benefits</Label>
-              <Textarea
-                id="benefits"
-                name="benefits"
-                placeholder="List the benefits and perks offered with this position..."
-                rows={3}
-                value={formData.benefits}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="flex justify-end space-x-4 pt-4">
+            <div className="flex justify-end space-x-4">
               <Button
                 type="button"
                 variant="outline"
@@ -266,7 +190,9 @@ export default function PostJobPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">Post Job</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Posting..." : "Post Job"}
+              </Button>
             </div>
           </form>
         </CardContent>
