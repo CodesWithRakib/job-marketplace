@@ -1,44 +1,187 @@
 "use client";
-
 import { ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Briefcase,
+  FileText,
+  BarChart3,
+  Menu,
+  X,
+  Search,
+  Bell,
+  User,
+} from "lucide-react";
+import { useState } from "react";
 
 export default function RecruiterLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [
-    { href: "/dashboard/recruiter", label: "Dashboard" },
-    { href: "/dashboard/recruiter/jobs", label: "My Jobs" },
-    { href: "/dashboard/recruiter/applications", label: "Applications" },
-    { href: "/dashboard/recruiter/analytics", label: "Analytics" },
+    {
+      href: "/dashboard/recruiter",
+      label: "Dashboard",
+      icon: <LayoutDashboard className="h-5 w-5" />,
+    },
+    {
+      href: "/dashboard/recruiter/jobs",
+      label: "My Jobs",
+      icon: <Briefcase className="h-5 w-5" />,
+    },
+    {
+      href: "/dashboard/recruiter/applications",
+      label: "Applications",
+      icon: <FileText className="h-5 w-5" />,
+    },
+    {
+      href: "/dashboard/recruiter/analytics",
+      label: "Analytics",
+      icon: <BarChart3 className="h-5 w-5" />,
+    },
   ];
 
   return (
-    <div className="flex h-full">
-      <aside className="hidden md:flex md:w-64 md:flex-col bg-white shadow-md h-full">
-        <div className="p-4 border-b">
-          <h1 className="text-xl font-bold text-green-600">Recruiter Portal</h1>
+    <div className="flex h-screen bg-gray-50">
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed md:static inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
+              <span className="text-white font-bold">R</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">
+              Recruiter Portal
+            </h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-        <nav className="p-4 space-y-2">
-          {navItems.map((item) => (
+
+        <div className="p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            Main Menu
+          </p>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <Button
+                key={item.href}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start space-x-3 rounded-lg",
+                  pathname === item.href
+                    ? "bg-green-50 text-green-700 font-medium"
+                    : "text-gray-600 hover:bg-gray-100"
+                )}
+                asChild
+              >
+                <Link href={item.href} onClick={() => setSidebarOpen(false)}>
+                  {item.icon}
+                  <span>{item.label}</span>
+                </Link>
+              </Button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-4 mt-6">
+          <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+            <h3 className="font-medium text-green-800 mb-1">Need help?</h3>
+            <p className="text-sm text-green-600 mb-3">
+              Check out our resources for recruiters
+            </p>
             <Button
-              key={item.href}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start",
-                pathname.startsWith(item.href) && "bg-green-100 text-green-700"
-              )}
-              asChild
+              size="sm"
+              className="w-full bg-green-600 hover:bg-green-700"
             >
-              <Link href={item.href}>{item.label}</Link>
+              View Resources
             </Button>
-          ))}
-        </nav>
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 w-full p-4 border-t">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50">
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+              <User className="h-5 w-5 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-800">
+                Recruiter Name
+              </p>
+              <p className="text-xs text-gray-500">recruiter@company.com</p>
+            </div>
+          </div>
+        </div>
       </aside>
-      <div className="flex-1 p-4 md:p-6 overflow-y-auto">{children}</div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top header */}
+        <header className="bg-white shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h1 className="ml-2 text-lg font-semibold text-gray-800">
+                Recruiter Portal
+              </h1>
+            </div>
+
+            <div className="hidden md:flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </Button>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Search className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
