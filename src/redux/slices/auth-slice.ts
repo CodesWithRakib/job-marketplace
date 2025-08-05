@@ -30,11 +30,11 @@ export const setUser = createAsyncThunk(
       const session = await getSession();
       if (session?.user) {
         return {
-          id: session.user.id,
+          id: session.user.id || session.user.email || "",
           email: session.user.email,
           name: session.user.name,
           image: session.user.image,
-          role: session.user.role,
+          role: (session.user as any).role || "user",
         };
       }
       return null;
@@ -43,7 +43,6 @@ export const setUser = createAsyncThunk(
     }
   }
 );
-
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials: LoginCredentials, { rejectWithValue }) => {
@@ -75,7 +74,16 @@ export const fetchCurrentUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const session = await authService.getCurrentUser();
-      return session?.user || null;
+      if (session?.user) {
+        return {
+          id: session.user.id || session.user.email || "",
+          email: session.user.email,
+          name: session.user.name,
+          image: session.user.image,
+          role: (session.user as any).role || "user",
+        };
+      }
+      return null;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch user");
     }
@@ -89,8 +97,18 @@ export const updateUserProfile = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const session = await authService.updateProfile(data);
-      return session?.user || null;
+      await authService.updateProfile(data);
+      const session = await getSession();
+      if (session?.user) {
+        return {
+          id: session.user.id || session.user.email || "",
+          email: session.user.email,
+          name: session.user.name,
+          image: session.user.image,
+          role: (session.user as any).role || "user",
+        };
+      }
+      return null;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to update profile");
     }
@@ -120,6 +138,22 @@ const authSlice = createSlice({
     setUserDirect: (state, action: PayloadAction<AuthState["user"]>) => {
       state.user = action.payload;
       state.isAuthenticated = !!action.payload;
+    },
+    // Set session data from NextAuth
+    setSession: (state, action: PayloadAction<any>) => {
+      if (action.payload) {
+        state.user = {
+          id: action.payload.id || action.payload.email || "",
+          email: action.payload.email,
+          name: action.payload.name,
+          image: action.payload.image,
+          role: action.payload.role || "user",
+        };
+        state.isAuthenticated = true;
+      } else {
+        state.user = null;
+        state.isAuthenticated = false;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -214,5 +248,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUserDirect } = authSlice.actions;
+export const { clearError, setUserDirect, setSession } = authSlice.actions;
 export default authSlice.reducer;

@@ -1,10 +1,12 @@
 "use client";
-
 import { useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
+import { setSession } from "@/redux/slices/auth-slice";
+import { getSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +36,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const dispatch = useDispatch();
 
   // Initialize form with proper types
   const {
@@ -54,19 +57,33 @@ export function RegisterForm() {
   const onSubmit: SubmitHandler<RegisterFormData> = async (data) => {
     setIsLoading(true);
     try {
+      console.log("Submitting registration with data:", data);
+
       // Register using auth service
       await authService.register(data);
 
-      // Show success message
-      toast.success("Registration successful!");
+      // Get session after registration and login
+      const session = await getSession();
+      console.log("Session after registration:", session);
+
+      if (session?.user) {
+        // Update Redux state with user data using setSession
+        dispatch(setSession(session.user));
+        toast.success("Registration and login successful!");
+        // Redirect to dashboard
+        router.push("/dashboard");
+      } else {
+        // Registration was successful but auto-login failed
+        toast.success(
+          "Registration successful! Please log in with your new account."
+        );
+        router.push("/login");
+      }
 
       // Reset form
       reset();
-
-      // Redirect to dashboard
-      router.push("/dashboard");
     } catch (error: any) {
-      console.error("Registration error:", error);
+      console.error("Registration error in form:", error);
       toast.error(error.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -90,6 +107,7 @@ export function RegisterForm() {
               placeholder="John Doe"
               {...register("fullName")}
               aria-invalid={!!errors.fullName}
+              disabled={isLoading}
             />
             {errors.fullName && (
               <p className="text-sm text-red-500">{errors.fullName.message}</p>
@@ -105,6 +123,7 @@ export function RegisterForm() {
               placeholder="your@email.com"
               {...register("email")}
               aria-invalid={!!errors.email}
+              disabled={isLoading}
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -120,6 +139,7 @@ export function RegisterForm() {
               placeholder="••••••••"
               {...register("password")}
               aria-invalid={!!errors.password}
+              disabled={isLoading}
             />
             {errors.password && (
               <p className="text-sm text-red-500">{errors.password.message}</p>

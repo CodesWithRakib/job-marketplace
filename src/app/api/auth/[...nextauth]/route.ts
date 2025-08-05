@@ -1,8 +1,31 @@
-import NextAuth from "next-auth";
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth, { DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import dbConnect from "@/lib/db";
-import User from "@/models/User";
+import User from "@/schemas/User";
 import bcrypt from "bcryptjs";
+
+// Extend the built-in session types
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    role: string;
+  }
+}
+
+// Extend the built-in JWT types
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    role: string;
+  }
+}
 
 const handler = NextAuth({
   providers: [
@@ -15,15 +38,19 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log("Missing credentials");
           return null;
         }
 
         try {
           await dbConnect();
+          console.log("Database connected for login");
 
           // Find user by email
           const user = await User.findOne({ email: credentials.email });
+
           if (!user) {
+            console.log("User not found in database");
             return null;
           }
 
@@ -32,7 +59,9 @@ const handler = NextAuth({
             credentials.password,
             user.password
           );
+
           if (!isPasswordValid) {
+            console.log("Invalid password");
             return null;
           }
 
@@ -40,9 +69,9 @@ const handler = NextAuth({
           return {
             id: user._id.toString(),
             email: user.email,
-            name: user.full_name,
+            name: user.name,
             role: user.role,
-            image: user.avatar_url,
+            image: user.avatar_url || "",
           };
         } catch (error) {
           console.error("Authorization error:", error);
@@ -53,26 +82,28 @@ const handler = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // When the user is first authenticated, add additional data to the token
       if (user) {
+        token.id = user.id;
         token.role = user.role;
-        token.id = user.id; // Add the user ID to the token
       }
       return token;
     },
     async session({ session, token }) {
+      // Add the token data to the session
       if (token) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
+        session.user.id = token.id;
+        session.user.role = token.role;
       }
       return session;
     },
   },
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
   },
   pages: {
     signIn: "/login",
-    signUp: "/register",
+    // signUp: "/register",
   },
   secret: process.env.NEXTAUTH_SECRET,
 });

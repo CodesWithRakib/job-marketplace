@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
-import authReducer from "./auth-slice";
-import jobReducer from "./job-slice";
-import chatReducer from "./chat-slice";
+import authReducer from "./slices/auth-slice";
+import jobReducer from "./slices/job-slice";
+import chatReducer from "./slices/chat-slice";
 
 export const store = configureStore({
   reducer: {

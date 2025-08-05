@@ -8,7 +8,7 @@ import {
   fetchUserApplications,
   deleteJob,
   updateApplicationStatus,
-} from "@/lib/job-slice";
+} from "@/redux/slices/job-slice";
 import {
   Card,
   CardContent,

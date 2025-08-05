@@ -10,7 +10,7 @@ import {
   saveJob,
   unsaveJob,
   applyToJob,
-} from "@/lib/job-slice";
+} from "@/redux/slices/job-slice";
 import {
   Card,
   CardContent,

@@ -1,6 +1,7 @@
+// app/api/auth/user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
-import User from "@/models/User";
+import User from "@/schemas/User";
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,9 +78,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Update user
+    // Update user - use 'name' to match the schema
     const updates: any = {};
-    if (fullName) updates.full_name = fullName;
+    if (fullName) updates.name = fullName; // Update 'name' field, not 'fullName'
     if (avatarUrl) updates.avatar_url = avatarUrl;
 
     const updatedUser = await User.findByIdAndUpdate(token, updates, {

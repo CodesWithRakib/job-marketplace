@@ -9,11 +9,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { setUser } from "@/redux/slices/auth-slice";
 
 export default function HomePage() {
-  const session = useSession();
-  const isAuthenticated = session.status === "authenticated";
-  console.log("Session:", session);
+  const { data: session, status } = useSession();
+  const dispatch = useDispatch();
+  const isAuthenticated = status === "authenticated";
+  const isLoading = status === "loading";
+
+  useEffect(() => {
+    if (session) {
+      dispatch(setUser(session.user));
+    }
+  }, [session, dispatch]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
@@ -41,7 +52,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
         <div className="mt-16">
           <h2 className="text-center text-3xl font-extrabold text-gray-900 sm:text-4xl">
             How It Works
@@ -86,7 +96,9 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <Button asChild className="w-full">
-                    <Link href="/register">Learn More</Link>
+                    <Link href={isAuthenticated ? "/chat" : "/register"}>
+                      {isAuthenticated ? "Go to Chat" : "Learn More"}
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>

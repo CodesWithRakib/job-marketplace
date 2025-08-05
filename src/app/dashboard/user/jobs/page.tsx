@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/lib/store";
-import { fetchJobs, saveJob, unsaveJob } from "@/lib/job-slice";
+import { fetchJobs, saveJob, unsaveJob } from "@/redux/slices/job-slice";
 import {
   Card,
   CardContent,

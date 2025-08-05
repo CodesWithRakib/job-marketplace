@@ -1,9 +1,14 @@
+// app/dashboard/admin/page.tsx
 "use client";
-
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "@/lib/store";
-import { fetchJobs } from "@/lib/job-slice";
+import { AppDispatch, RootState } from "@/redux/store";
+import {
+  fetchJobs,
+  fetchUsers,
+  fetchApplications,
+} from "@/redux/slices/job-slice";
+import { useSession } from "next-auth/react";
 import {
   Card,
   CardContent,
@@ -26,50 +31,30 @@ import {
   Activity,
   Server,
   Plus,
+  Edit,
+  Trash2,
+  Eye,
 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 
 export default function AdminDashboard() {
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useAuth();
-  const { jobs, isLoading } = useSelector((state: RootState) => state.jobs);
-
+  const { data: session } = useSession();
+  const { jobs, users, applications, isLoading } = useSelector(
+    (state: RootState) => state.jobs
+  );
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     dispatch(fetchJobs());
+    dispatch(fetchUsers());
+    dispatch(fetchApplications());
   }, [dispatch]);
 
-  // Mock data for users and applications
-  const totalUsers = 1248;
-  const totalApplications = 342;
-  const activeRecruiters = 42;
-  const recentUsers = [
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      role: "user",
-      status: "active",
-      date: "2 hours ago",
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "recruiter",
-      status: "active",
-      date: "5 hours ago",
-    },
-    {
-      id: 3,
-      name: "Robert Johnson",
-      email: "robert@example.com",
-      role: "user",
-      status: "pending",
-      date: "1 day ago",
-    },
-  ];
+  // Calculate stats from actual data
+  const totalUsers = users?.length || 0;
+  const totalApplications = applications?.length || 0;
+  const activeRecruiters =
+    users?.filter((user) => user.role === "recruiter").length || 0;
 
   if (isLoading) {
     return (
@@ -89,13 +74,16 @@ export default function AdminDashboard() {
         </div>
         <div className="flex items-center space-x-4">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={user?.avatar_url || ""} alt={user?.full_name} />
+            <AvatarImage
+              src={session?.user?.image || ""}
+              alt={session?.user?.name}
+            />
             <AvatarFallback>
-              {user?.full_name?.charAt(0).toUpperCase()}
+              {session?.user?.name?.charAt(0).toUpperCase() || "A"}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="font-medium">{user?.full_name}</p>
+            <p className="font-medium">{session?.user?.name || "Admin User"}</p>
             <p className="text-sm text-gray-500">Administrator</p>
           </div>
         </div>
@@ -119,7 +107,7 @@ export default function AdminDashboard() {
             <Briefcase className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{jobs.length}</div>
+            <div className="text-2xl font-bold">{jobs?.length || 0}</div>
             <p className="text-xs text-muted-foreground">Currently posted</p>
           </CardContent>
         </Card>
@@ -178,7 +166,6 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -230,15 +217,16 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentUsers.map((user) => (
+                {users?.slice(0, 5).map((user) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between p-3 border rounded-lg"
                   >
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.image || ""} alt={user.name} />
                         <AvatarFallback>
-                          {user.name.charAt(0).toUpperCase()}
+                          {user.name?.charAt(0).toUpperCase() || "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div>
@@ -253,9 +241,11 @@ export default function AdminDashboard() {
                           user.status === "active" ? "default" : "secondary"
                         }
                       >
-                        {user.status}
+                        {user.status || "active"}
                       </Badge>
-                      <span className="text-xs text-gray-500">{user.date}</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -299,7 +289,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {recentUsers.map((user) => (
+                  {users?.map((user) => (
                     <tr key={user.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
@@ -320,19 +310,19 @@ export default function AdminDashboard() {
                             user.status === "active" ? "default" : "secondary"
                           }
                         >
-                          {user.status}
+                          {user.status || "active"}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.date}
+                        {new Date(user.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm">
-                            Edit
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button variant="destructive" size="sm">
-                            Delete
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -379,7 +369,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {jobs.map((job) => (
+                  {jobs?.map((job) => (
                     <tr key={job.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
@@ -393,7 +383,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {job.recruiter_name || "N/A"}
+                          {job.recruiterName || "N/A"}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -406,18 +396,18 @@ export default function AdminDashboard() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {job.application_count || 0}
+                        {job.applicationCount || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm">
-                            View
+                            <Eye className="h-4 w-4" />
                           </Button>
                           <Button variant="outline" size="sm">
-                            Edit
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button variant="destructive" size="sm">
-                            Delete
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>

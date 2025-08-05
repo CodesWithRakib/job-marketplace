@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/lib/store";
 import { getSession } from "next-auth/react";
-import { setUser } from "@/lib/auth-slice";
+import { setUser } from "@/redux/slices/auth-slice";
 
 export function useAuth() {
   const dispatch = useDispatch();
