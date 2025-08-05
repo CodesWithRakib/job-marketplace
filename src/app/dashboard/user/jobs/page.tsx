@@ -1,16 +1,18 @@
+// app/dashboard/user/jobs/page.tsx
 "use client";
-
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/lib/store";
-import { fetchJobs, saveJob, unsaveJob } from "@/redux/slices/job-slice";
+import { AppDispatch, RootState } from "@/redux/store";
+import { fetchUserJobs } from "@/redux/slices/job-slice";
+import { useSession } from "next-auth/react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,226 +23,246 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Search,
+  Filter,
   MapPin,
-  DollarSign,
   Clock,
+  DollarSign,
   Bookmark,
-  BookmarkCheck,
+  Eye,
 } from "lucide-react";
+import { format } from "date-fns";
+import Link from "next/link";
 
-export default function JobsPage() {
-  const dispatch = useDispatch();
-  const { jobs, savedJobs, isLoading } = useSelector(
-    (state: RootState) => state.jobs
-  );
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { toast } = useToast();
-
+export default function UserJobsPage() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { userJobs, isLoading } = useSelector((state: RootState) => state.jobs);
+  const { data: session } = useSession();
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const itemsPerPage = 10;
 
   useEffect(() => {
-    dispatch(fetchJobs());
-    if (user) {
-      dispatch(fetchSavedJobs(user.id));
-    }
-  }, [dispatch, user]);
+    dispatch(fetchUserJobs());
+  }, [dispatch]);
 
-  // Filter jobs based on search and filters
-  const filteredJobs = jobs.filter((job) => {
+  // Filter jobs based on search term and filters
+  const filteredJobs = userJobs?.filter((job) => {
     const matchesSearch =
-      searchTerm === "" ||
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchTerm.toLowerCase());
-
+      job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation =
       locationFilter === "" ||
       job.location.toLowerCase().includes(locationFilter.toLowerCase());
-
-    const matchesType = typeFilter === "" || job.job_type === typeFilter;
-
+    const matchesType = typeFilter === "" || job.type === typeFilter;
     return matchesSearch && matchesLocation && matchesType;
   });
 
-  const isJobSaved = (jobId: string) => {
-    return savedJobs.some((job) => job.id === jobId);
+  // Pagination
+  const totalPages = Math.ceil((filteredJobs?.length || 0) / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentJobs = filteredJobs?.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
+
+  const handleApplyJob = (jobId: string) => {
+    // In a real app, you would navigate to the job details page or open an application modal
+    console.log("Applying to job:", jobId);
   };
 
-  const handleSaveJob = async (jobId: string) => {
-    if (!user) return;
-
-    try {
-      if (isJobSaved(jobId)) {
-        await dispatch(unsaveJob({ userId: user.id, jobId })).unwrap();
-        toast({
-          title: "Job unsaved",
-          description: "Job removed from your saved list",
-        });
-      } else {
-        await dispatch(saveJob({ userId: user.id, jobId })).unwrap();
-        toast({
-          title: "Job saved",
-          description: "Job added to your saved list",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save job",
-        variant: "destructive",
-      });
-    }
+  const handleSaveJob = (jobId: string) => {
+    // In a real app, you would dispatch an action to save the job
+    console.log("Saving job:", jobId);
   };
 
-  const getJobTypeBadgeColor = (type: string) => {
+  const getTypeBadgeVariant = (type: string) => {
     switch (type) {
       case "full-time":
-        return "bg-blue-500";
+        return "default";
       case "part-time":
-        return "bg-green-500";
+        return "secondary";
       case "contract":
-        return "bg-purple-500";
+        return "outline";
       case "internship":
-        return "bg-yellow-500";
+        return "destructive";
       default:
-        return "bg-gray-500";
+        return "outline";
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        Loading jobs...
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Job Listings</h1>
+        <p className="text-gray-600 mt-1">
+          Browse and apply to job opportunities
+        </p>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Find Jobs</CardTitle>
-          <CardDescription>Browse available job opportunities</CardDescription>
+          <CardTitle>Find Your Dream Job</CardTitle>
+          <CardDescription>
+            Search through thousands of job listings
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search jobs..."
+                className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
               />
             </div>
-            <Input
-              placeholder="Location"
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-            />
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Job Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
-                <SelectItem value="full-time">Full Time</SelectItem>
-                <SelectItem value="part-time">Part Time</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="internship">Internship</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-full md:w-40">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="new york">New York</SelectItem>
+                  <SelectItem value="san francisco">San Francisco</SelectItem>
+                  <SelectItem value="london">London</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full md:w-40">
+                  <SelectValue placeholder="Job Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="full-time">Full Time</SelectItem>
+                  <SelectItem value="part-time">Part Time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {filteredJobs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">
-                No jobs found matching your criteria
-              </p>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {filteredJobs.map((job) => (
-                <Card
-                  key={job.id}
-                  className="hover:shadow-md transition-shadow"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-2">
-                          <h3 className="text-lg font-semibold mr-3">
-                            {job.title}
-                          </h3>
-                          <Badge className={getJobTypeBadgeColor(job.job_type)}>
-                            {job.job_type.replace("-", " ")}
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job Title</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Salary</TableHead>
+                      <TableHead>Posted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentJobs?.map((job) => (
+                      <TableRow key={job.id}>
+                        <TableCell className="font-medium">
+                          {job.title}
+                        </TableCell>
+                        <TableCell>{job.company}</TableCell>
+                        <TableCell>{job.location}</TableCell>
+                        <TableCell>
+                          <Badge variant={getTypeBadgeVariant(job.type)}>
+                            {job.type}
                           </Badge>
-                        </div>
-                        <p className="text-gray-600 mb-4">
-                          {job.description.substring(0, 150)}...
-                        </p>
-
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            {job.location}
+                        </TableCell>
+                        <TableCell>{job.salary}</TableCell>
+                        <TableCell>
+                          {format(new Date(job.createdAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={`/dashboard/user/jobs/${job.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSaveJob(job.id)}
+                            >
+                              <Bookmark className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApplyJob(job.id)}
+                            >
+                              Apply
+                            </Button>
                           </div>
-                          <div className="flex items-center">
-                            <DollarSign className="h-4 w-4 mr-1" />
-                            {job.salary}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1" />
-                            Posted {format(new Date(job.created_at), "MMM dd")}
-                          </div>
-                        </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {job.skills?.slice(0, 5).map((skill, index) => (
-                            <Badge key={index} variant="outline">
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end space-y-2 ml-4">
+              {totalPages > 1 && (
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      const page = i + 1;
+                      return (
                         <Button
-                          variant="ghost"
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
                           size="sm"
-                          onClick={() => handleSaveJob(job.id)}
-                          className="p-2"
+                          onClick={() => setCurrentPage(page)}
                         >
-                          {isJobSaved(job.id) ? (
-                            <BookmarkCheck className="h-5 w-5 text-blue-600" />
-                          ) : (
-                            <Bookmark className="h-5 w-5" />
-                          )}
+                          {page}
                         </Button>
-
-                        <Button asChild>
-                          <Link href={`/dashboard/user/jobs/${job.id}`}>
-                            View Details
-                          </Link>
-                        </Button>
-
-                        <Button variant="outline" asChild>
-                          <Link href={`/dashboard/user/jobs/${job.id}/apply`}>
-                            Apply Now
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -1,148 +1,287 @@
-export default function SavedJobs() {
-  const savedJobs = [
-    {
-      id: 1,
-      title: "Senior React Developer",
-      company: "Tech Innovations",
-      location: "San Francisco, CA",
-      type: "Full-time",
-      salary: "$120,000 - $150,000",
-      posted: "2 days ago",
-    },
-    {
-      id: 2,
-      title: "Frontend Engineer",
-      company: "WebSolutions Co.",
-      location: "Remote",
-      type: "Contract",
-      salary: "$80,000 - $100,000",
-      posted: "1 week ago",
-    },
-    {
-      id: 3,
-      title: "UI/UX Developer",
-      company: "Design Masters",
-      location: "New York, NY",
-      type: "Part-time",
-      salary: "$60,000 - $75,000",
-      posted: "3 weeks ago",
-    },
-  ];
+// app/dashboard/user/saved-jobs/page.tsx
+"use client";
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/redux/store";
+import { fetchSavedJobs, unsaveJob } from "@/redux/slices/job-slice";
+import { useSession } from "next-auth/react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Search,
+  Filter,
+  MapPin,
+  Clock,
+  DollarSign,
+  Eye,
+  Bookmark,
+  Trash2,
+} from "lucide-react";
+import { format } from "date-fns";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useTheme } from "next-themes";
+
+export default function UserSavedJobsPage() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { savedJobs, isLoading } = useSelector(
+    (state: RootState) => state.jobs
+  );
+  const { data: session } = useSession();
+  const { theme } = useTheme();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  const itemsPerPage = 10;
+
+  // Handle hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.id && mounted) {
+      dispatch(fetchSavedJobs(session.user.id));
+    }
+  }, [dispatch, session, mounted]);
+
+  // Filter jobs based on search term and filters
+  const filteredJobs = savedJobs?.filter((job) => {
+    const matchesSearch =
+      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.company.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocation =
+      locationFilter === "" ||
+      job.location.toLowerCase().includes(locationFilter.toLowerCase());
+    const matchesType = typeFilter === "" || job.type === typeFilter;
+    return matchesSearch && matchesLocation && matchesType;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil((filteredJobs?.length || 0) / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentJobs = filteredJobs?.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
+
+  const handleUnsaveJob = (jobId: string) => {
+    if (session?.user?.id) {
+      dispatch(unsaveJob({ userId: session.user.id, jobId }))
+        .unwrap()
+        .then(() => {
+          toast.success("Job removed from saved jobs");
+        })
+        .catch((error) => {
+          toast.error(error.message || "Failed to remove job");
+        });
+    }
+  };
+
+  const getTypeBadgeVariant = (type: string) => {
+    switch (type) {
+      case "full-time":
+        return "default";
+      case "part-time":
+        return "secondary";
+      case "contract":
+        return "outline";
+      case "internship":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  };
+
+  // Don't render anything until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Saved Jobs</h1>
-        <p className="text-gray-600">Jobs you&apos;ve saved for later</p>
+        <h1 className="text-3xl font-bold">Saved Jobs</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Jobs you&apos;ve saved for later
+        </p>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {savedJobs.map((job) => (
-          <div
-            key={job.id}
-            className="bg-white rounded-lg shadow overflow-hidden"
-          >
-            <div className="p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{job.title}</h3>
-                  <p className="text-gray-600">{job.company}</p>
-                </div>
-                <button className="text-gray-400 hover:text-red-500">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center text-sm text-gray-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  {job.location}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  {job.type}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  {job.salary}
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-between items-center">
-                <span className="text-xs text-gray-500">
-                  Posted {job.posted}
-                </span>
-                <div className="space-x-2">
-                  <button className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                    Apply
-                  </button>
-                  <button className="text-sm border border-gray-300 px-3 py-1 rounded hover:bg-gray-50">
-                    View
-                  </button>
-                </div>
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Saved Jobs</CardTitle>
+          <CardDescription>
+            Manage and apply to jobs you&apos;re interested in
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search saved jobs..."
+                className="pl-8 dark:bg-gray-800 dark:border-gray-700"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-full md:w-40 dark:bg-gray-800 dark:border-gray-700">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="new york">New York</SelectItem>
+                  <SelectItem value="san francisco">San Francisco</SelectItem>
+                  <SelectItem value="london">London</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full md:w-40 dark:bg-gray-800 dark:border-gray-700">
+                  <SelectValue placeholder="Job Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="full-time">Full Time</SelectItem>
+                  <SelectItem value="part-time">Part Time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        ))}
-      </div>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-md border dark:border-gray-700">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job Title</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Salary</TableHead>
+                      <TableHead>Saved</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentJobs?.map((job) => (
+                      <TableRow key={job.id} className="dark:border-gray-700">
+                        <TableCell className="font-medium">
+                          {job.title}
+                        </TableCell>
+                        <TableCell>{job.company}</TableCell>
+                        <TableCell>{job.location}</TableCell>
+                        <TableCell>
+                          <Badge variant={getTypeBadgeVariant(job.type)}>
+                            {job.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{job.salary}</TableCell>
+                        <TableCell>
+                          {format(new Date(job.savedAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={`/dashboard/user/jobs/${job.jobId}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUnsaveJob(job.jobId)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-end space-x-2 py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      const page = i + 1;
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

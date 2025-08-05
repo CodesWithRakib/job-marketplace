@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setSession } from "@/redux/slices/auth-slice";
 import { getSession } from "next-auth/react";
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { authService } from "@/services/auth";
+import { Eye, EyeOff, Loader2, User, Briefcase } from "lucide-react";
+import Link from "next/link";
 
 // Define the schema with proper validation
 const registerSchema = z.object({
@@ -35,8 +37,11 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch();
+  const roleParam = searchParams.get("role") || "user";
 
   // Initialize form with proper types
   const {
@@ -44,21 +49,24 @@ export function RegisterForm() {
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
+    watch,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
       password: "",
       fullName: "",
-      role: "user", // Default role
+      role: roleParam as "user" | "recruiter",
     },
   });
+
+  const selectedRole = watch("role");
 
   const onSubmit: SubmitHandler<RegisterFormData> = async (data) => {
     setIsLoading(true);
     try {
       console.log("Submitting registration with data:", data);
-
       // Register using auth service
       await authService.register(data);
 
@@ -67,7 +75,7 @@ export function RegisterForm() {
       console.log("Session after registration:", session);
 
       if (session?.user) {
-        // Update Redux state with user data using setSession
+        // Update Redux state with user data
         dispatch(setSession(session.user));
         toast.success("Registration and login successful!");
         // Redirect to dashboard
@@ -79,7 +87,6 @@ export function RegisterForm() {
         );
         router.push("/login");
       }
-
       // Reset form
       reset();
     } catch (error: any) {
@@ -90,13 +97,21 @@ export function RegisterForm() {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Register</CardTitle>
-        <CardDescription>Create a new account to get started</CardDescription>
+    <Card className="w-full max-w-md shadow-lg">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold text-center">
+          Create Account
+        </CardTitle>
+        <CardDescription className="text-center">
+          Join our platform to find your dream job or ideal candidate
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Full Name Field */}
           <div className="space-y-2">
@@ -108,6 +123,7 @@ export function RegisterForm() {
               {...register("fullName")}
               aria-invalid={!!errors.fullName}
               disabled={isLoading}
+              className={errors.fullName ? "border-red-500" : ""}
             />
             {errors.fullName && (
               <p className="text-sm text-red-500">{errors.fullName.message}</p>
@@ -124,6 +140,7 @@ export function RegisterForm() {
               {...register("email")}
               aria-invalid={!!errors.email}
               disabled={isLoading}
+              className={errors.email ? "border-red-500" : ""}
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -132,15 +149,42 @@ export function RegisterForm() {
 
           {/* Password Field */}
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              {...register("password")}
-              aria-invalid={!!errors.password}
-              disabled={isLoading}
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={togglePasswordVisibility}
+                className="h-auto p-0 text-xs"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </Button>
+            </div>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                {...register("password")}
+                aria-invalid={!!errors.password}
+                disabled={isLoading}
+                className={errors.password ? "border-red-500" : ""}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={togglePasswordVisibility}
+                className="absolute right-0 top-0 h-full px-3"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
             {errors.password && (
               <p className="text-sm text-red-500">{errors.password.message}</p>
             )}
@@ -148,17 +192,30 @@ export function RegisterForm() {
 
           {/* Role Field */}
           <div className="space-y-2">
-            <Label htmlFor="role">I am a</Label>
-            <select
-              id="role"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              {...register("role")}
-              aria-invalid={!!errors.role}
-              disabled={isLoading}
-            >
-              <option value="user">Job Seeker</option>
-              <option value="recruiter">Recruiter</option>
-            </select>
+            <Label>I am a</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={selectedRole === "user" ? "default" : "outline"}
+                className="flex items-center justify-center"
+                onClick={() => setValue("role", "user")}
+                disabled={isLoading}
+              >
+                <User className="mr-2 h-4 w-4" />
+                Job Seeker
+              </Button>
+              <Button
+                type="button"
+                variant={selectedRole === "recruiter" ? "default" : "outline"}
+                className="flex items-center justify-center"
+                onClick={() => setValue("role", "recruiter")}
+                disabled={isLoading}
+              >
+                <Briefcase className="mr-2 h-4 w-4" />
+                Recruiter
+              </Button>
+            </div>
+            <input type="hidden" {...register("role")} />
             {errors.role && (
               <p className="text-sm text-red-500">{errors.role.message}</p>
             )}
@@ -166,9 +223,27 @@ export function RegisterForm() {
 
           {/* Submit Button */}
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Creating account..." : "Register"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              "Create Account"
+            )}
           </Button>
         </form>
+
+        <div className="text-center text-sm text-gray-600">
+          By creating an account, you agree to our{" "}
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );

@@ -1,10 +1,9 @@
-// app/dashboard/user/applications/page.tsx
+// app/dashboard/admin/applications/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchUserApplications } from "@/redux/slices/job-slice";
-import { useSession } from "next-auth/react";
+import { fetchApplications } from "@/redux/slices/job-slice";
 import {
   Table,
   TableBody,
@@ -30,16 +29,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Search, Filter, Eye, FileText, Calendar } from "lucide-react";
+import { Search, Filter, MoreHorizontal, Eye, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import Link from "next/link";
 
-export default function UserApplicationsPage() {
+export default function AdminApplicationsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { userApplications, isLoading } = useSelector(
+  const { applications, isLoading } = useSelector(
     (state: RootState) => state.jobs
   );
-  const { data: session } = useSession();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -47,16 +52,21 @@ export default function UserApplicationsPage() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    if (session?.user?.id) {
-      dispatch(fetchUserApplications(session.user.id));
-    }
-  }, [dispatch, session]);
+    dispatch(fetchApplications());
+  }, [dispatch]);
 
   // Filter applications based on search term and status
-  const filteredApplications = userApplications?.filter((application) => {
+  const filteredApplications = applications?.filter((application) => {
     const matchesSearch =
-      application.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      application.jobCompany?.toLowerCase().includes(searchTerm.toLowerCase());
+      application.userId?.name
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      application.jobId?.title
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      application.jobId?.company
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || application.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -87,20 +97,31 @@ export default function UserApplicationsPage() {
     }
   };
 
+  const handleExportApplications = () => {
+    // In a real app, you would implement export functionality
+    alert("Export functionality would be implemented here");
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">My Applications</h1>
-        <p className="text-gray-600 mt-1">
-          Track the status of your job applications
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Applications Management</h1>
+          <p className="text-gray-600 mt-1">
+            Manage job applications on the platform
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleExportApplications}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Application History</CardTitle>
+          <CardTitle>Application List</CardTitle>
           <CardDescription>
-            View and track all your job applications
+            View and manage all job applications on the platform.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,6 +162,7 @@ export default function UserApplicationsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Applicant</TableHead>
                       <TableHead>Job</TableHead>
                       <TableHead>Company</TableHead>
                       <TableHead>Status</TableHead>
@@ -152,9 +174,10 @@ export default function UserApplicationsPage() {
                     {currentApplications?.map((application) => (
                       <TableRow key={application.id}>
                         <TableCell className="font-medium">
-                          {application.jobTitle}
+                          {application.userId?.name}
                         </TableCell>
-                        <TableCell>{application.jobCompany}</TableCell>
+                        <TableCell>{application.jobId?.title}</TableCell>
+                        <TableCell>{application.jobId?.company}</TableCell>
                         <TableCell>
                           <Badge
                             variant={getStatusBadgeVariant(application.status)}
@@ -169,14 +192,31 @@ export default function UserApplicationsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" asChild>
-                            <Link
-                              href={`/dashboard/user/applications/${application.id}`}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Link>
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem>
+                                Mark as Reviewed
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                Accept Application
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                Reject Application
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}

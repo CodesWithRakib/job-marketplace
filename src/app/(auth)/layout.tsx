@@ -1,6 +1,10 @@
+"use client";
 import { ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Toaster } from "sonner";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -8,23 +12,34 @@ interface AuthLayoutProps {
 }
 
 export default function AuthLayout({ children, formType }: AuthLayoutProps) {
+  const searchParams = useSearchParams();
+  const role = searchParams.get("role");
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold">Job Marketplace</h1>
+          <Link href="/" className="inline-flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </Link>
+          <h1 className="text-3xl font-bold mt-4 text-indigo-700">
+            Job Marketplace
+          </h1>
           <p className="text-gray-600 mt-2">
             Find your dream job or ideal candidate
           </p>
         </div>
+
         {children}
+
         <div className="mt-6 text-center text-sm">
           {formType === "login" ? (
             <p>
               Don&apos;t have an account?{" "}
               <Link
-                href="/register"
-                className="font-medium text-primary hover:underline"
+                href={`/register${role ? `?role=${role}` : ""}`}
+                className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
               >
                 Sign up
               </Link>
@@ -34,7 +49,7 @@ export default function AuthLayout({ children, formType }: AuthLayoutProps) {
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="font-medium text-primary hover:underline"
+                className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
               >
                 Sign in
               </Link>

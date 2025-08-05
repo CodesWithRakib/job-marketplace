@@ -1,13 +1,9 @@
 // app/dashboard/recruiter/page.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import {
-  fetchRecruiterJobs,
-  fetchRecruiterApplications,
-  deleteJob,
-} from "@/redux/slices/job-slice";
+import { fetchRecruiterAnalytics } from "@/redux/slices/job-slice";
 import { useSession } from "next-auth/react";
 import {
   Card,
@@ -16,60 +12,52 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Users,
+  BarChart3,
   Briefcase,
   FileText,
-  CheckCircle,
-  AlertCircle,
-  Settings,
-  BarChart3,
-  Activity,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
+  TrendingUp,
+  TrendingDown,
   Calendar,
-  MapPin,
-  DollarSign,
+  Download,
 } from "lucide-react";
-import Link from "next/link";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from "recharts";
+import { Button } from "@/components/ui/button";
 
-export default function RecruiterDashboard() {
+export default function RecruiterDashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { data: session } = useSession();
-  const { recruiterJobs, recruiterApplications, isLoading } = useSelector(
+  const { recruiterAnalytics, isLoading } = useSelector(
     (state: RootState) => state.jobs
   );
-  const [activeTab, setActiveTab] = useState("overview");
+  const { data: session } = useSession();
+  const [timeRange, setTimeRange] = useState("30");
 
   useEffect(() => {
     if (session?.user?.id) {
-      dispatch(fetchRecruiterJobs(session.user.id));
-      dispatch(fetchRecruiterApplications(session.user.id));
+      dispatch(
+        fetchRecruiterAnalytics({ recruiterId: session.user.id, timeRange })
+      );
     }
-  }, [dispatch, session]);
+  }, [dispatch, session, timeRange]);
 
-  // Calculate stats from actual data
-  const totalJobs = recruiterJobs?.length || 0;
-  const activeJobs =
-    recruiterJobs?.filter((job) => job.status === "active").length || 0;
-  const totalApplications = recruiterApplications?.length || 0;
-  const pendingApplications =
-    recruiterApplications?.filter((app) => app.status === "pending").length ||
-    0;
-
-  const handleDeleteJob = async (jobId: string) => {
-    if (window.confirm("Are you sure you want to delete this job?")) {
-      await dispatch(deleteJob(jobId));
-      if (session?.user?.id) {
-        dispatch(fetchRecruiterJobs(session.user.id));
-      }
-    }
+  const handleExportData = () => {
+    // Functionality to export analytics data
+    alert("Export functionality would be implemented here");
   };
 
   if (isLoading) {
@@ -80,86 +68,120 @@ export default function RecruiterDashboard() {
     );
   }
 
+  if (!recruiterAnalytics) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">No analytics data available</h1>
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare data for charts
+  const jobGrowthData = recruiterAnalytics.jobs.growth.map((item: any) => ({
+    date: item._id,
+    jobs: item.count,
+  }));
+
+  const applicationGrowthData = recruiterAnalytics.applications.growth.map(
+    (item: any) => ({
+      date: item._id,
+      applications: item.count,
+    })
+  );
+
+  const applicationStatusDistributionData =
+    recruiterAnalytics.applicationStatusDistribution.map((item: any) => ({
+      name: item._id,
+      value: item.count,
+    }));
+
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Recruiter Dashboard</h1>
           <p className="text-gray-600 mt-1">
-            Manage your jobs and applications
+            Track your job postings and application trends
           </p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage
-              src={session?.user?.image || ""}
-              alt={session?.user?.name}
-            />
-            <AvatarFallback>
-              {session?.user?.name?.charAt(0).toUpperCase() || "R"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{session?.user?.name || "Recruiter"}</p>
-            <p className="text-sm text-gray-500">Recruiter</p>
-          </div>
+        <div className="flex gap-2">
+          <Tabs value={timeRange} onValueChange={setTimeRange}>
+            <TabsList>
+              <TabsTrigger value="7">Last 7 days</TabsTrigger>
+              <TabsTrigger value="30">Last 30 days</TabsTrigger>
+              <TabsTrigger value="90">Last 90 days</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" onClick={handleExportData}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-blue-500">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
-            <Briefcase className="h-4 w-4 text-blue-500" />
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalJobs}</div>
-            <p className="text-xs text-muted-foreground">Posted jobs</p>
+            <div className="text-2xl font-bold">
+              {recruiterAnalytics.jobs.total}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {recruiterAnalytics.jobs.active} active jobs
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-            <Briefcase className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeJobs}</div>
-            <p className="text-xs text-muted-foreground">Currently active</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-yellow-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Applications</CardTitle>
-            <FileText className="h-4 w-4 text-yellow-500" />
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalApplications}</div>
-            <p className="text-xs text-muted-foreground">Total applications</p>
+            <div className="text-2xl font-bold">
+              {recruiterAnalytics.applications.total}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {recruiterAnalytics.applications.new} new in the last {timeRange}{" "}
+              days
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-purple-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <AlertCircle className="h-4 w-4 text-purple-500" />
+            <CardTitle className="text-sm font-medium">
+              Application Rate
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingApplications}</div>
-            <p className="text-xs text-muted-foreground">Need review</p>
+            <div className="text-2xl font-bold">
+              {recruiterAnalytics.jobs.total > 0
+                ? (
+                    recruiterAnalytics.applications.total /
+                    recruiterAnalytics.jobs.total
+                  ).toFixed(1)
+                : "0"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Average applications per job
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
-        <TabsList className="grid w-full grid-cols-3">
+      {/* Charts */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="jobs">My Jobs</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="applications">Applications</TabsTrigger>
         </TabsList>
 
@@ -167,79 +189,118 @@ export default function RecruiterDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Application Stats
-                </CardTitle>
-                <CardDescription>Application status breakdown</CardDescription>
+                <CardTitle>Job Postings</CardTitle>
+                <CardDescription>Your job postings over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span>Pending</span>
-                    <Badge variant="secondary">{pendingApplications}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Reviewed</span>
-                    <Badge variant="outline">
-                      {recruiterApplications?.filter(
-                        (app) => app.status === "reviewed"
-                      ).length || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Accepted</span>
-                    <Badge variant="default">
-                      {recruiterApplications?.filter(
-                        (app) => app.status === "accepted"
-                      ).length || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Rejected</span>
-                    <Badge variant="destructive">
-                      {recruiterApplications?.filter(
-                        (app) => app.status === "rejected"
-                      ).length || 0}
-                    </Badge>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={jobGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="jobs"
+                      stroke="#8884d8"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Activity
-                </CardTitle>
+                <CardTitle>Application Trends</CardTitle>
                 <CardDescription>
-                  Latest applications and updates
+                  Application submissions over time
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={applicationGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="applications"
+                      stroke="#82ca9d"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Status Distribution</CardTitle>
+                <CardDescription>
+                  Breakdown of application statuses
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={applicationStatusDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {applicationStatusDistributionData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Performing Jobs</CardTitle>
+                <CardDescription>
+                  Jobs with the most applications
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recruiterApplications?.slice(0, 3).map((application) => (
+                  {recruiterAnalytics.topJobs.map((job: any, index: number) => (
                     <div
-                      key={application.id}
-                      className="flex items-start space-x-3"
+                      key={job.id}
+                      className="flex items-center justify-between"
                     >
-                      {application.status === "pending" && (
-                        <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
-                      )}
-                      {application.status === "accepted" && (
-                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                      )}
-                      {application.status === "rejected" && (
-                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">
-                          New application for {application.jobTitle}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {application.userName} •{" "}
-                          {new Date(application.createdAt).toLocaleDateString()}
-                        </p>
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                          <span className="text-indigo-800 font-medium text-sm">
+                            {index + 1}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium">{job.title}</p>
+                          <p className="text-sm text-gray-500">
+                            {job.applicationCount} applications
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {job.viewCount || 0} views
                       </div>
                     </div>
                   ))}
@@ -247,256 +308,187 @@ export default function RecruiterDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="jobs" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Postings Trend</CardTitle>
+                <CardDescription>
+                  Detailed view of your job postings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={jobGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="jobs" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Statistics</CardTitle>
+                <CardDescription>Detailed job metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold">Total Jobs</h3>
+                    <p className="text-3xl font-bold">
+                      {recruiterAnalytics.jobs.total}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {recruiterAnalytics.jobs.active} active jobs
+                    </p>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold">New Jobs</h3>
+                    <p className="text-3xl font-bold">
+                      {jobGrowthData.reduce((sum, item) => sum + item.jobs, 0)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Posted in the last {timeRange} days
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold">Job Growth Rate</h3>
+                    <p className="text-3xl font-bold">
+                      {recruiterAnalytics.jobs.total > 0
+                        ? (
+                            (jobGrowthData.reduce(
+                              (sum, item) => sum + item.jobs,
+                              0
+                            ) /
+                              recruiterAnalytics.jobs.total) *
+                            100
+                          ).toFixed(1)
+                        : "0"}
+                      %
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Growth in the last {timeRange} days
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="applications" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Trends</CardTitle>
+                <CardDescription>
+                  Detailed view of application submissions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={applicationGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="applications" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Status Distribution</CardTitle>
+                <CardDescription>
+                  Breakdown of application statuses
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={applicationStatusDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {applicationStatusDistributionData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common tasks for recruiters</CardDescription>
+              <CardTitle>Application Statistics</CardTitle>
+              <CardDescription>Detailed application metrics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link href="/dashboard/recruiter/post-job">
-                  <Button className="w-full h-20 flex flex-col gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>Post New Job</span>
-                  </Button>
-                </Link>
-                <Link href="/dashboard/recruiter/applications">
-                  <Button
-                    variant="outline"
-                    className="w-full h-20 flex flex-col gap-2"
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>Review Applications</span>
-                  </Button>
-                </Link>
-                <Link href="/dashboard/recruiter/messages">
-                  <Button
-                    variant="outline"
-                    className="w-full h-20 flex flex-col gap-2"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span>Messages</span>
-                  </Button>
-                </Link>
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Total Applications</h3>
+                  <p className="text-3xl font-bold">
+                    {recruiterAnalytics.applications.total}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {recruiterAnalytics.applications.new} new in the last{" "}
+                    {timeRange} days
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">
+                    Accepted Applications
+                  </h3>
+                  <p className="text-3xl font-bold">
+                    {applicationStatusDistributionData.find(
+                      (s: any) => s._id === "accepted"
+                    )?.value || 0}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Successfully hired candidates
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Application Rate</h3>
+                  <p className="text-3xl font-bold">
+                    {recruiterAnalytics.jobs.total > 0
+                      ? (
+                          recruiterAnalytics.applications.total /
+                          recruiterAnalytics.jobs.total
+                        ).toFixed(1)
+                      : "0"}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Average applications per job
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="jobs" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">My Jobs</h2>
-            <Link href="/dashboard/recruiter/post-job">
-              <Button className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Post New Job
-              </Button>
-            </Link>
-          </div>
-
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Job Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Applications
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Posted
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {recruiterJobs?.map((job) => (
-                    <tr key={job.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {job.title}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {job.company}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          {job.location}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="outline">{job.type}</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          variant={
-                            job.status === "active" ? "default" : "secondary"
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {job.applicationCount || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(job.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <Link href={`/dashboard/recruiter/jobs/${job.id}`}>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Link
-                            href={`/dashboard/recruiter/jobs/${job.id}/edit`}
-                          >
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteJob(job.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="applications" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Applications</h2>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                Export CSV
-              </Button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Candidate
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Job
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Applied
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {recruiterApplications?.map((application) => (
-                    <tr key={application.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Avatar className="h-8 w-8 mr-3">
-                            <AvatarImage
-                              src={application.userImage || ""}
-                              alt={application.userName}
-                            />
-                            <AvatarFallback>
-                              {application.userName?.charAt(0).toUpperCase() ||
-                                "C"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {application.userName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {application.userEmail}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {application.jobTitle}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {application.jobCompany}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(application.createdAt).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          variant={
-                            application.status === "pending"
-                              ? "secondary"
-                              : application.status === "accepted"
-                              ? "default"
-                              : "destructive"
-                          }
-                        >
-                          {application.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <Link
-                            href={`/dashboard/recruiter/applications/${application.id}`}
-                          >
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Link
-                            href={`/dashboard/recruiter/messages/${application.userId}`}
-                          >
-                            <Button variant="outline" size="sm">
-                              Message
-                            </Button>
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

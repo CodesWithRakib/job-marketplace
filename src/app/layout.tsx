@@ -11,6 +11,18 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Job Marketplace",
   description: "Find your dream job or ideal candidate",
+  keywords: ["jobs", "careers", "recruitment", "hiring"],
+  authors: [{ name: "Job Marketplace Team" }],
+  openGraph: {
+    title: "Job Marketplace",
+    description: "Find your dream job or ideal candidate",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+  viewport: "width=device-width, initial-scale=1",
 };
 
 export default function RootLayout({
@@ -20,7 +32,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter?.className}>
         <Providers>
           <SessionSync />
           <ThemeProvider

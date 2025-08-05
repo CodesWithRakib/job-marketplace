@@ -1,176 +1,410 @@
-export default function AdminSettings() {
+// app/dashboard/admin/settings/page.tsx
+"use client";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Save, RefreshCw } from "lucide-react";
+
+export default function AdminSettingsPage() {
+  const [settings, setSettings] = useState({
+    userRegistration: true,
+    jobPosting: true,
+    emailNotifications: true,
+    analytics: true,
+    maintenanceMode: false,
+    siteName: "Job Marketplace",
+    siteDescription: "Find your dream job or ideal candidate",
+    adminEmail: "admin@jobmarketplace.com",
+    maxFileSize: 5242880, // 5MB in bytes
+    allowedFileTypes: [".pdf", ".doc", ".docx"],
+    jobsPerPage: 10,
+    applicationsPerPage: 10,
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSaveSettings = async () => {
+    setIsLoading(true);
+    try {
+      // In a real app, you would make an API call to save settings
+      console.log("Saving settings:", settings);
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      alert("Settings saved successfully!");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      alert("Failed to save settings. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetSettings = () => {
+    if (confirm("Are you sure you want to reset all settings to default?")) {
+      setSettings({
+        userRegistration: true,
+        jobPosting: true,
+        emailNotifications: true,
+        analytics: true,
+        maintenanceMode: false,
+        siteName: "Job Marketplace",
+        siteDescription: "Find your dream job or ideal candidate",
+        adminEmail: "admin@jobmarketplace.com",
+        maxFileSize: 5242880,
+        allowedFileTypes: [".pdf", ".doc", ".docx"],
+        jobsPerPage: 10,
+        applicationsPerPage: 10,
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">System Settings</h1>
-        <p className="text-gray-600">Configure system-wide settings</p>
+        <h1 className="text-3xl font-bold">Settings</h1>
+        <p className="text-gray-600 mt-1">
+          Manage platform settings and configuration
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">General Settings</h2>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Site Name
-                </label>
-                <input
-                  type="text"
-                  defaultValue="Job Portal"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Site Information</CardTitle>
+              <CardDescription>
+                Manage basic site information and appearance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="siteName">Site Name</Label>
+                  <Input
+                    id="siteName"
+                    value={settings.siteName}
+                    onChange={(e) =>
+                      setSettings({ ...settings, siteName: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="adminEmail">Admin Email</Label>
+                  <Input
+                    id="adminEmail"
+                    type="email"
+                    value={settings.adminEmail}
+                    onChange={(e) =>
+                      setSettings({ ...settings, adminEmail: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="siteDescription">Site Description</Label>
+                <Textarea
+                  id="siteDescription"
+                  value={settings.siteDescription}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      siteDescription: e.target.value,
+                    })
+                  }
+                  rows={3}
                 />
               </div>
+            </CardContent>
+          </Card>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Site URL
-                </label>
-                <input
-                  type="text"
-                  defaultValue="https://jobportal.example.com"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+          <Card>
+            <CardHeader>
+              <CardTitle>Maintenance Mode</CardTitle>
+              <CardDescription>
+                Temporarily disable the site for maintenance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="maintenanceMode">
+                    Enable Maintenance Mode
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    When enabled, only administrators can access the site
+                  </p>
+                </div>
+                <Switch
+                  id="maintenanceMode"
+                  checked={settings.maintenanceMode}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, maintenanceMode: checked })
+                  }
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Admin Email
-                </label>
-                <input
-                  type="email"
-                  defaultValue="admin@jobportal.com"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+        <TabsContent value="features" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature Toggles</CardTitle>
+              <CardDescription>
+                Enable or disable platform features
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="userRegistration">User Registration</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow new users to register on the platform
+                  </p>
+                </div>
+                <Switch
+                  id="userRegistration"
+                  checked={settings.userRegistration}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, userRegistration: checked })
+                  }
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Timezone
-                </label>
-                <select className="w-full p-2 border border-gray-300 rounded-md">
-                  <option>(GMT-05:00) Eastern Time</option>
-                  <option>(GMT-06:00) Central Time</option>
-                  <option>(GMT-07:00) Mountain Time</option>
-                  <option>(GMT-08:00) Pacific Time</option>
-                </select>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Email Configuration</h2>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SMTP Server
-                </label>
-                <input
-                  type="text"
-                  defaultValue="smtp.jobportal.com"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="jobPosting">Job Posting</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow recruiters to post new jobs
+                  </p>
+                </div>
+                <Switch
+                  id="jobPosting"
+                  checked={settings.jobPosting}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, jobPosting: checked })
+                  }
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SMTP Port
-                </label>
-                <input
-                  type="text"
-                  defaultValue="587"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="emailNotifications">
+                    Email Notifications
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send email notifications for various events
+                  </p>
+                </div>
+                <Switch
+                  id="emailNotifications"
+                  checked={settings.emailNotifications}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, emailNotifications: checked })
+                  }
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SMTP Username
-                </label>
-                <input
-                  type="text"
-                  defaultValue="notifications@jobportal.com"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="analytics">Analytics</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Collect and display analytics data
+                  </p>
+                </div>
+                <Switch
+                  id="analytics"
+                  checked={settings.analytics}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, analytics: checked })
+                  }
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SMTP Password
-                </label>
-                <input
-                  type="password"
-                  defaultValue="********"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+        <TabsContent value="email" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email Configuration</CardTitle>
+              <CardDescription>
+                Configure email settings and templates
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="smtpHost">SMTP Host</Label>
+                  <Input id="smtpHost" placeholder="smtp.example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtpPort">SMTP Port</Label>
+                  <Input id="smtpPort" placeholder="587" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="smtpUser">SMTP Username</Label>
+                  <Input id="smtpUser" placeholder="username" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtpPassword">SMTP Password</Label>
+                  <Input
+                    id="smtpPassword"
+                    type="password"
+                    placeholder="password"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emailFrom">From Email Address</Label>
+                <Input
+                  id="emailFrom"
+                  value={settings.adminEmail}
+                  onChange={(e) =>
+                    setSettings({ ...settings, adminEmail: e.target.value })
+                  }
                 />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                >
-                  Save Configuration
-                </button>
+        <TabsContent value="advanced" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>File Upload Settings</CardTitle>
+              <CardDescription>
+                Configure file upload restrictions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="maxFileSize">Max File Size (bytes)</Label>
+                  <Input
+                    id="maxFileSize"
+                    type="number"
+                    value={settings.maxFileSize}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        maxFileSize: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="allowedFileTypes">Allowed File Types</Label>
+                  <Input
+                    id="allowedFileTypes"
+                    value={settings.allowedFileTypes.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        allowedFileTypes: e.target.value.split(", "),
+                      })
+                    }
+                  />
+                </div>
               </div>
-            </form>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">System Information</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Version</span>
-                <span className="font-medium">v2.1.0</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Pagination Settings</CardTitle>
+              <CardDescription>
+                Configure pagination settings for lists
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="jobsPerPage">Jobs Per Page</Label>
+                  <Select
+                    value={settings.jobsPerPage.toString()}
+                    onValueChange={(value) =>
+                      setSettings({ ...settings, jobsPerPage: parseInt(value) })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="applicationsPerPage">
+                    Applications Per Page
+                  </Label>
+                  <Select
+                    value={settings.applicationsPerPage.toString()}
+                    onValueChange={(value) =>
+                      setSettings({
+                        ...settings,
+                        applicationsPerPage: parseInt(value),
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Last Updated</span>
-                <span className="font-medium">June 15, 2023</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Environment</span>
-                <span className="font-medium">Production</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Database</span>
-                <span className="font-medium">PostgreSQL 14</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Storage</span>
-                <span className="font-medium">AWS S3</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4">Maintenance</h2>
-            <div className="space-y-4">
-              <button className="w-full bg-gray-100 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-200">
-                Clear Cache
-              </button>
-              <button className="w-full bg-gray-100 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-200">
-                Regenerate Thumbnails
-              </button>
-              <button className="w-full bg-gray-100 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-200">
-                Optimize Database
-              </button>
-              <button className="w-full bg-red-100 text-red-800 px-4 py-2 rounded-md hover:bg-red-200">
-                Backup System
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={handleResetSettings}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Reset to Default
+        </Button>
+        <Button onClick={handleSaveSettings} disabled={isLoading}>
+          <Save className="mr-2 h-4 w-4" />
+          {isLoading ? "Saving..." : "Save Changes"}
+        </Button>
       </div>
     </div>
   );

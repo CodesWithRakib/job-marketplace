@@ -1,4 +1,4 @@
-// app/dashboard/user/profile/page.tsx
+// app/dashboard/recruiter/profile/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
@@ -15,19 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Briefcase,
-  Edit,
-  Save,
-  Upload,
-} from "lucide-react";
-import { toast } from "sonner";
+import { User, Mail, Phone, MapPin, Building, Edit, Save } from "lucide-react";
 
-export default function UserProfilePage() {
+export default function RecruiterProfilePage() {
   const { data: session } = useSession();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -35,12 +25,9 @@ export default function UserProfilePage() {
     email: "",
     phone: "",
     bio: "",
+    company: "",
     location: "",
     website: "",
-    skills: [] as string[],
-    experience: "",
-    education: "",
-    resume: "",
   });
 
   useEffect(() => {
@@ -50,12 +37,9 @@ export default function UserProfilePage() {
         email: session.user.email || "",
         phone: "",
         bio: "",
+        company: "",
         location: "",
         website: "",
-        skills: [],
-        experience: "",
-        education: "",
-        resume: "",
       });
     }
   }, [session]);
@@ -64,43 +48,14 @@ export default function UserProfilePage() {
     // In a real app, you would make an API call to save the profile
     console.log("Saving profile:", profileData);
     setIsEditing(false);
-    toast.success("Profile saved successfully!");
-  };
-
-  const handleSkillAdd = (skill: string) => {
-    if (skill && !profileData.skills.includes(skill)) {
-      setProfileData({
-        ...profileData,
-        skills: [...profileData.skills, skill],
-      });
-    }
-  };
-
-  const handleSkillRemove = (skill: string) => {
-    setProfileData({
-      ...profileData,
-      skills: profileData.skills.filter((s) => s !== skill),
-    });
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // In a real app, you would upload the file to a server
-      console.log("Uploading file:", file);
-      setProfileData({
-        ...profileData,
-        resume: file.name,
-      });
-      toast.success("Resume uploaded successfully!");
-    }
+    alert("Profile saved successfully!");
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">User Profile</h1>
+          <h1 className="text-3xl font-bold">Recruiter Profile</h1>
           <p className="text-gray-600 mt-1">Manage your profile information</p>
         </div>
         <Button
@@ -124,7 +79,7 @@ export default function UserProfilePage() {
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile Information</TabsTrigger>
-          <TabsTrigger value="resume">Resume</TabsTrigger>
+          <TabsTrigger value="company">Company Details</TabsTrigger>
           <TabsTrigger value="settings">Account Settings</TabsTrigger>
         </TabsList>
 
@@ -172,6 +127,8 @@ export default function UserProfilePage() {
                     />
                   </div>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
                   <div className="relative">
@@ -224,131 +181,50 @@ export default function UserProfilePage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="company" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Professional Information</CardTitle>
+              <CardTitle>Company Information</CardTitle>
               <CardDescription>
-                Update your professional details
+                Update your company details and information
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="experience">Experience</Label>
-                  <Textarea
-                    id="experience"
-                    value={profileData.experience}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        experience: e.target.value,
-                      })
-                    }
-                    disabled={!isEditing}
-                    rows={4}
-                    placeholder="Describe your work experience..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="education">Education</Label>
-                  <Textarea
-                    id="education"
-                    value={profileData.education}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        education: e.target.value,
-                      })
-                    }
-                    disabled={!isEditing}
-                    rows={4}
-                    placeholder="Describe your education..."
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Skills</Label>
-                <div className="flex flex-wrap gap-2">
-                  {profileData.skills.map((skill, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="flex items-center"
-                    >
-                      {skill}
-                      {isEditing && (
-                        <button
-                          type="button"
-                          className="ml-1 text-xs"
-                          onClick={() => handleSkillRemove(skill)}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                {isEditing && (
-                  <div className="flex mt-2">
+                  <Label htmlFor="company">Company Name</Label>
+                  <div className="relative">
+                    <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Add a skill"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleSkillAdd(e.currentTarget.value);
-                          e.currentTarget.value = "";
-                        }
-                      }}
+                      id="company"
+                      value={profileData.company}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          company: e.target.value,
+                        })
+                      }
+                      disabled={!isEditing}
+                      className="pl-10"
                     />
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="resume" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resume</CardTitle>
-              <CardDescription>Upload and manage your resume</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="resume">Current Resume</Label>
-                <div className="flex items-center justify-between p-4 border rounded-md">
-                  <div className="flex items-center">
-                    <Briefcase className="h-8 w-8 text-gray-400 mr-3" />
-                    <div>
-                      <p className="font-medium">
-                        {profileData.resume || "No resume uploaded"}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {profileData.resume
-                          ? "PDF, DOC, or DOCX"
-                          : "Upload your resume"}
-                      </p>
-                    </div>
-                  </div>
-                  {isEditing && (
-                    <div>
-                      <Label htmlFor="resume-upload" className="cursor-pointer">
-                        <Button variant="outline" size="sm" asChild>
-                          <span>
-                            <Upload className="h-4 w-4 mr-1" />
-                            {profileData.resume ? "Replace" : "Upload"}
-                          </span>
-                        </Button>
-                      </Label>
-                      <Input
-                        id="resume-upload"
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                        onChange={handleFileUpload}
-                      />
-                    </div>
-                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    value={profileData.website}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        website: e.target.value,
+                      })
+                    }
+                    disabled={!isEditing}
+                    placeholder="https://example.com"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -369,7 +245,7 @@ export default function UserProfilePage() {
                   <div>
                     <h3 className="text-lg font-medium">Email Notifications</h3>
                     <p className="text-sm text-gray-500">
-                      Receive email notifications for application updates
+                      Receive email notifications for new applications
                     </p>
                   </div>
                   <Badge variant="default">Enabled</Badge>
@@ -378,7 +254,7 @@ export default function UserProfilePage() {
                   <div>
                     <h3 className="text-lg font-medium">Profile Visibility</h3>
                     <p className="text-sm text-gray-500">
-                      Make your profile visible to recruiters
+                      Make your profile visible to job seekers
                     </p>
                   </div>
                   <Badge variant="default">Public</Badge>

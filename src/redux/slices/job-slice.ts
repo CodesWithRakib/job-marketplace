@@ -101,6 +101,48 @@ interface SavedJobItem {
   salary: string;
 }
 
+// Analytics interfaces
+interface AdminAnalytics {
+  users: {
+    total: number;
+    new: number;
+    growth: Array<{ _id: string; count: number }>;
+  };
+  jobs: {
+    total: number;
+    new: number;
+    growth: Array<{ _id: string; count: number }>;
+  };
+  applications: {
+    total: number;
+    new: number;
+    growth: Array<{ _id: string; count: number }>;
+  };
+  roleDistribution: Array<{ _id: string; count: number }>;
+  jobTypeDistribution: Array<{ _id: string; count: number }>;
+  applicationStatusDistribution: Array<{ _id: string; count: number }>;
+}
+
+interface RecruiterAnalytics {
+  jobs: {
+    total: number;
+    active: number;
+    growth: Array<{ _id: string; count: number }>;
+  };
+  applications: {
+    total: number;
+    new: number;
+    growth: Array<{ _id: string; count: number }>;
+  };
+  applicationStatusDistribution: Array<{ _id: string; count: number }>;
+  topJobs: Array<{
+    id: string;
+    title: string;
+    applicationCount: number;
+    viewCount: number;
+  }>;
+}
+
 interface JobState {
   jobs: Job[];
   users: User[];
@@ -113,6 +155,8 @@ interface JobState {
   userApplications: UserApplication[];
   savedJobs: SavedJobItem[];
   currentJob: any;
+  analytics: AdminAnalytics | null;
+  recruiterAnalytics: RecruiterAnalytics | null;
 }
 
 const initialState: JobState = {
@@ -127,6 +171,8 @@ const initialState: JobState = {
   userApplications: [],
   savedJobs: [],
   currentJob: null,
+  analytics: null,
+  recruiterAnalytics: null,
 };
 
 // Async thunks
@@ -264,11 +310,9 @@ export const unsaveJob = createAsyncThunk(
       const savedJob = savedJobsResponse.data.savedJobs.find(
         (job: any) => job.jobId === jobId
       );
-
       if (!savedJob) {
         return rejectWithValue("Saved job not found");
       }
-
       await api.delete(`/user/saved-jobs/${savedJob.id}`);
       return jobId;
     } catch (error: any) {
@@ -355,6 +399,41 @@ export const fetchApplications = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.error || "Failed to fetch applications"
+      );
+    }
+  }
+);
+
+// Admin Analytics
+export const fetchAdminAnalytics = createAsyncThunk(
+  "jobs/fetchAdminAnalytics",
+  async (timeRange: string, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/admin/analytics?timeRange=${timeRange}`);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to fetch admin analytics"
+      );
+    }
+  }
+);
+
+// Recruiter Analytics
+export const fetchRecruiterAnalytics = createAsyncThunk(
+  "jobs/fetchRecruiterAnalytics",
+  async (
+    { recruiterId, timeRange }: { recruiterId: string; timeRange: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.get(
+        `/recruiter/analytics?recruiterId=${recruiterId}&timeRange=${timeRange}`
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to fetch recruiter analytics"
       );
     }
   }
@@ -548,6 +627,32 @@ const jobSlice = createSlice({
         state.currentJob = action.payload;
       })
       .addCase(fetchJobById.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Admin Analytics
+      .addCase(fetchAdminAnalytics.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminAnalytics.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.analytics = action.payload;
+      })
+      .addCase(fetchAdminAnalytics.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Recruiter Analytics
+      .addCase(fetchRecruiterAnalytics.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchRecruiterAnalytics.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.recruiterAnalytics = action.payload;
+      })
+      .addCase(fetchRecruiterAnalytics.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });

@@ -1,14 +1,9 @@
 // app/dashboard/admin/page.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import {
-  fetchJobs,
-  fetchUsers,
-  fetchApplications,
-} from "@/redux/slices/job-slice";
-import { useSession } from "next-auth/react";
+import { fetchAdminAnalytics } from "@/redux/slices/job-slice";
 import {
   Card,
   CardContent,
@@ -16,45 +11,47 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  BarChart3,
   Users,
   Briefcase,
   FileText,
-  CheckCircle,
-  AlertCircle,
-  Settings,
-  BarChart3,
-  Activity,
-  Server,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Download,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+} from "recharts";
+import { Button } from "@/components/ui/button";
 
-export default function AdminDashboard() {
+export default function AdminDashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { data: session } = useSession();
-  const { jobs, users, applications, isLoading } = useSelector(
-    (state: RootState) => state.jobs
-  );
-  const [activeTab, setActiveTab] = useState("overview");
+  const { analytics, isLoading } = useSelector((state: RootState) => state.jobs);
+  const [timeRange, setTimeRange] = useState("30");
 
   useEffect(() => {
-    dispatch(fetchJobs());
-    dispatch(fetchUsers());
-    dispatch(fetchApplications());
-  }, [dispatch]);
+    dispatch(fetchAdminAnalytics(timeRange));
+  }, [dispatch, timeRange]);
 
-  // Calculate stats from actual data
-  const totalUsers = users?.length || 0;
-  const totalApplications = applications?.length || 0;
-  const activeRecruiters =
-    users?.filter((user) => user.role === "recruiter").length || 0;
+  const handleExportData = () => {
+    // Functionality to export analytics data
+    alert("Export functionality would be implemented here");
+  };
 
   if (isLoading) {
     return (
@@ -64,463 +61,486 @@ export default function AdminDashboard() {
     );
   }
 
+  if (!analytics) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">No analytics data available</h1>
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare data for charts
+  const userGrowthData = analytics.users.growth.map((item: any) => ({
+    date: item._id,
+    users: item.count,
+  }));
+
+  const jobGrowthData = analytics.jobs.growth.map((item: any) => ({
+    date: item._id,
+    jobs: item.count,
+  }));
+
+  const applicationGrowthData = analytics.applications.growth.map((item: any) => ({
+    date: item._id,
+    applications: item.count,
+  }));
+
+  const roleDistributionData = analytics.roleDistribution.map((item: any) => ({
+    name: item._id,
+    value: item.count,
+  }));
+
+  const jobTypeDistributionData = analytics.jobTypeDistribution.map((item: any) => ({
+    name: item._id,
+    value: item.count,
+  }));
+
+  const applicationStatusDistributionData = analytics.applicationStatusDistribution.map(
+    (item: any) => ({
+      name: item._id,
+      value: item.count,
+    })
+  );
+
+  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-1">System overview and management</p>
+          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <p className="text-gray-600 mt-1">
+            Track user growth, job postings, and application trends
+          </p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage
-              src={session?.user?.image || ""}
-              alt={session?.user?.name}
-            />
-            <AvatarFallback>
-              {session?.user?.name?.charAt(0).toUpperCase() || "A"}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium">{session?.user?.name || "Admin User"}</p>
-            <p className="text-sm text-gray-500">Administrator</p>
-          </div>
+        <div className="flex gap-2">
+          <Tabs value={timeRange} onValueChange={setTimeRange}>
+            <TabsList>
+              <TabsTrigger value="7">Last 7 days</TabsTrigger>
+              <TabsTrigger value="30">Last 30 days</TabsTrigger>
+              <TabsTrigger value="90">Last 90 days</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" onClick={handleExportData}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-blue-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsers}</div>
-            <p className="text-xs text-muted-foreground">Registered users</p>
+            <div className="text-2xl font-bold">{analytics.users.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.users.new} new in the last {timeRange} days
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-green-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-            <Briefcase className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{jobs?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">Currently posted</p>
+            <div className="text-2xl font-bold">{analytics.jobs.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.jobs.new} new in the last {timeRange} days
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-yellow-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Applications</CardTitle>
-            <FileText className="h-4 w-4 text-yellow-500" />
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalApplications}</div>
-            <p className="text-xs text-muted-foreground">Total applications</p>
+            <div className="text-2xl font-bold">{analytics.applications.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.applications.new} new in the last {timeRange} days
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-purple-500">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recruiters</CardTitle>
-            <Users className="h-4 w-4 text-purple-500" />
+            <CardTitle className="text-sm font-medium">Active Recruiters</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeRecruiters}</div>
-            <p className="text-xs text-muted-foreground">Active recruiters</p>
+            <div className="text-2xl font-bold">
+              {analytics.roleDistribution.find((r: any) => r._id === "recruiter")?.count || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Currently active on the platform
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4"
-      >
-        <TabsList className="grid w-full grid-cols-4">
+      {/* Charts */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="jobs">Jobs</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  User Growth
-                </CardTitle>
-                <CardDescription>
-                  New user registrations over time
-                </CardDescription>
+                <CardTitle>User Growth</CardTitle>
+                <CardDescription>New user registrations over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
-                  <p className="text-gray-500">
-                    Chart visualization would go here
-                  </p>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={userGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="users"
+                      stroke="#8884d8"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  System Activity
-                </CardTitle>
-                <CardDescription>Recent system activities</CardDescription>
+                <CardTitle>Job Postings</CardTitle>
+                <CardDescription>New job postings over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        System backup completed
-                      </p>
-                      <p className="text-xs text-gray-500">2 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        High CPU usage detected
-                      </p>
-                      <p className="text-xs text-gray-500">5 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        Security scan completed
-                      </p>
-                      <p className="text-xs text-gray-500">1 day ago</p>
-                    </div>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={jobGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="jobs"
+                      stroke="#82ca9d"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Trends</CardTitle>
+                <CardDescription>Application submissions over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={applicationGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="applications"
+                      stroke="#ffc658"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>User Role Distribution</CardTitle>
+                <CardDescription>Distribution of user roles on the platform</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={roleDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {roleDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Growth</CardTitle>
+                <CardDescription>Detailed view of user registrations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={userGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="users" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>User Role Distribution</CardTitle>
+                <CardDescription>Breakdown of user roles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={roleDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="count"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {roleDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent User Registrations</CardTitle>
-              <CardDescription>
-                Latest users to join the platform
-              </CardDescription>
+              <CardTitle>User Statistics</CardTitle>
+              <CardDescription>Detailed user metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {users?.slice(0, 5).map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.image || ""} alt={user.name} />
-                        <AvatarFallback>
-                          {user.name?.charAt(0).toUpperCase() || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{user.role}</Badge>
-                      <Badge
-                        variant={
-                          user.status === "active" ? "default" : "secondary"
-                        }
-                      >
-                        {user.status || "active"}
-                      </Badge>
-                      <span className="text-xs text-gray-500">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Total Users</h3>
+                  <p className="text-3xl font-bold">{analytics.users.total}</p>
+                  <p className="text-sm text-gray-600">
+                    {analytics.users.new} new in the last {timeRange} days
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Active Users</h3>
+                  <p className="text-3xl font-bold">
+                    {Math.round(analytics.users.total * 0.75)}
+                  </p>
+                  <p className="text-sm text-gray-600">Approximately 75% of total users</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">User Growth Rate</h3>
+                  <p className="text-3xl font-bold">
+                    {((analytics.users.new / analytics.users.total) * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-gray-600">Growth in the last {timeRange} days</p>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">User Management</h2>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add User
-            </Button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Joined
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {users?.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {user.email}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="outline">{user.role}</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          variant={
-                            user.status === "active" ? "default" : "secondary"
-                          }
-                        >
-                          {user.status || "active"}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="jobs" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Job Management</h2>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Job
-            </Button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Job Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Company
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Recruiter
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Applications
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {jobs?.map((job) => (
-                    <tr key={job.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {job.title}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {job.company}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {job.recruiterName || "N/A"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          variant={
-                            job.status === "active" ? "default" : "secondary"
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {job.applicationCount || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="system" className="space-y-6">
+        <TabsContent value="jobs" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Server className="h-5 w-5" />
-                  System Status
-                </CardTitle>
-                <CardDescription>Status of system services</CardDescription>
+                <CardTitle>Job Postings Trend</CardTitle>
+                <CardDescription>Detailed view of job postings</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span>Database</span>
-                    <Badge variant="default">Operational</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Authentication</span>
-                    <Badge variant="default">Operational</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Email Service</span>
-                    <Badge variant="default">Operational</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>File Storage</span>
-                    <Badge variant="secondary">Degraded</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>API Gateway</span>
-                    <Badge variant="default">Operational</Badge>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={jobGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="jobs" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  System Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure system-wide settings
-                </CardDescription>
+                <CardTitle>Job Type Distribution</CardTitle>
+                <CardDescription>Breakdown of job types</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span>User Registration</span>
-                    <Badge variant="default">Enabled</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Job Posting</span>
-                    <Badge variant="default">Enabled</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Email Notifications</span>
-                    <Badge variant="default">Enabled</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Analytics</span>
-                    <Badge variant="default">Enabled</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Maintenance Mode</span>
-                    <Badge variant="secondary">Disabled</Badge>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={jobTypeDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="count"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {jobTypeDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>System Maintenance</CardTitle>
-              <CardDescription>
-                Perform system maintenance tasks
-              </CardDescription>
+              <CardTitle>Job Statistics</CardTitle>
+              <CardDescription>Detailed job metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <span>Clear Cache</span>
-                  <span className="text-xs text-gray-500">
-                    Clear system cache
-                  </span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <span>Backup Database</span>
-                  <span className="text-xs text-gray-500">Create backup</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <span>Run Diagnostics</span>
-                  <span className="text-xs text-gray-500">
-                    Check system health
-                  </span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <span>View Logs</span>
-                  <span className="text-xs text-gray-500">System logs</span>
-                </Button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Total Jobs</h3>
+                  <p className="text-3xl font-bold">{analytics.jobs.total}</p>
+                  <p className="text-sm text-gray-600">
+                    {analytics.jobs.new} new in the last {timeRange} days
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Active Jobs</h3>
+                  <p className="text-3xl font-bold">
+                    {Math.round(analytics.jobs.total * 0.8)}
+                  </p>
+                  <p className="text-sm text-gray-600">Approximately 80% of total jobs</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Job Growth Rate</h3>
+                  <p className="text-3xl font-bold">
+                    {((analytics.jobs.new / analytics.jobs.total) * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-gray-600">Growth in the last {timeRange} days</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="applications" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Trends</CardTitle>
+                <CardDescription>Detailed view of application submissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={applicationGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="applications" fill="#ffc658" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Application Status Distribution</CardTitle>
+                <CardDescription>Breakdown of application statuses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={applicationStatusDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="count"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {applicationStatusDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Statistics</CardTitle>
+              <CardDescription>Detailed application metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Total Applications</h3>
+                  <p className="text-3xl font-bold">{analytics.applications.total}</p>
+                  <p className="text-sm text-gray-600">
+                    {analytics.applications.new} new in the last {timeRange} days
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Accepted Applications</h3>
+                  <p className="text-3xl font-bold">
+                    {applicationStatusDistributionData.find((s: any) => s._id === "accepted")?.count || 0}
+                  </p>
+                  <p className="text-sm text-gray-600">Successfully hired candidates</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold">Application Rate</h3>
+                  <p className="text-3xl font-bold">
+                    {(analytics.applications.total / analytics.jobs.total).toFixed(1)}
+                  </p>
+                  <p className="text-sm text-gray-600">Average applications per job</p>
+                </div>
               </div>
             </CardContent>
           </Card>
