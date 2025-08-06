@@ -14,6 +14,10 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  HelpCircle,
+  Users,
+  BookOpen,
+  Search,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -22,16 +26,103 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard/user", icon: BarChart3 },
-  { name: "Jobs", href: "/dashboard/user/jobs", icon: Briefcase },
+  {
+    name: "Dashboard",
+    href: "/dashboard/user",
+    icon: BarChart3,
+    description: "Your job search overview and activity",
+  },
+  {
+    name: "Job Search",
+    href: "/dashboard/user/jobs",
+    icon: Search,
+    children: [
+      { name: "Browse Jobs", href: "/dashboard/user/jobs/browse" },
+      { name: "Recommended Jobs", href: "/dashboard/user/jobs/recommended" },
+      { name: "Recent Views", href: "/dashboard/user/jobs/recent" },
+    ],
+  },
   {
     name: "Applications",
     href: "/dashboard/user/applications",
     icon: FileText,
+    children: [
+      { name: "All Applications", href: "/dashboard/user/applications" },
+      { name: "Active", href: "/dashboard/user/applications/active" },
+      {
+        name: "Interview Stage",
+        href: "/dashboard/user/applications/interviews",
+      },
+      { name: "Offers", href: "/dashboard/user/applications/offers" },
+      { name: "Archived", href: "/dashboard/user/applications/archived" },
+    ],
   },
-  { name: "Saved Jobs", href: "/dashboard/user/saved-jobs", icon: Bookmark },
-  { name: "Profile", href: "/dashboard/user/profile", icon: User },
-  { name: "Settings", href: "/dashboard/user/settings", icon: Settings },
+  {
+    name: "Saved Jobs",
+    href: "/dashboard/user/saved-jobs",
+    icon: Bookmark,
+    children: [
+      { name: "All Saved", href: "/dashboard/user/saved-jobs" },
+      { name: "Recently Viewed", href: "/dashboard/user/saved-jobs/recent" },
+      { name: "Applied To", href: "/dashboard/user/saved-jobs/applied" },
+    ],
+  },
+  {
+    name: "Career Resources",
+    href: "/dashboard/user/resources",
+    icon: BookOpen,
+    children: [
+      { name: "Resume Builder", href: "/dashboard/user/resources/resume" },
+      {
+        name: "Cover Letters",
+        href: "/dashboard/user/resources/cover-letters",
+      },
+      { name: "Interview Prep", href: "/dashboard/user/resources/interviews" },
+      {
+        name: "Skills Assessment",
+        href: "/dashboard/user/resources/assessments",
+      },
+    ],
+  },
+  {
+    name: "Profile",
+    href: "/dashboard/user/profile",
+    icon: User,
+    children: [
+      { name: "View Profile", href: "/dashboard/user/profile" },
+      { name: "Work Experience", href: "/dashboard/user/profile/experience" },
+      { name: "Education", href: "/dashboard/user/profile/education" },
+      { name: "Skills", href: "/dashboard/user/profile/skills" },
+      { name: "Portfolio", href: "/dashboard/user/profile/portfolio" },
+    ],
+  },
+  {
+    name: "Networking",
+    href: "/dashboard/user/network",
+    icon: Users,
+    children: [
+      { name: "Connections", href: "/dashboard/user/network" },
+      { name: "Followed Companies", href: "/dashboard/user/network/companies" },
+      { name: "Messages", href: "/dashboard/user/network/messages" },
+    ],
+  },
+  {
+    name: "Settings",
+    href: "/dashboard/user/settings",
+    icon: Settings,
+    children: [
+      { name: "Account", href: "/dashboard/user/settings/account" },
+      { name: "Privacy", href: "/dashboard/user/settings/privacy" },
+      { name: "Notifications", href: "/dashboard/user/settings/notifications" },
+      { name: "Email Preferences", href: "/dashboard/user/settings/email" },
+    ],
+  },
+  {
+    name: "Help Center",
+    href: "/dashboard/user/help",
+    icon: HelpCircle,
+    description: "Get support with your job search",
+  },
 ];
 
 interface SidebarProps {

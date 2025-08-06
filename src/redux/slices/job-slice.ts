@@ -38,18 +38,30 @@ interface User {
   image?: string;
   status?: string;
   createdAt: string;
+  profileImage?: string;
+  phone?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
 }
 
+// Define the Job type
 interface Job {
-  id: string;
+  _id: string;
   title: string;
   company: string;
   description: string;
-  status: string;
+  location: string;
+  type: "full-time" | "part-time" | "contract" | "internship" | "remote";
+  salary: string;
+  status: "active" | "inactive";
+  applicationDeadline?: string;
+  experience?: string;
+  skills: string[];
   recruiterId: string;
-  recruiterName?: string;
-  applicationCount?: number;
+  applicationCount: number;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface Application {
@@ -439,12 +451,121 @@ export const fetchRecruiterAnalytics = createAsyncThunk(
   }
 );
 
+// User management thunks
+export const createUser = createAsyncThunk(
+  "jobs/createUser",
+  async (userData: any, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/admin/users", userData);
+      return response.data.user;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to create user"
+      );
+    }
+  }
+);
+
+export const updateUser = createAsyncThunk(
+  "jobs/updateUser",
+  async (
+    { userId, userData }: { userId: string; userData: any },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.put(`/admin/users/${userId}`, userData);
+      return response.data.user;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to update user"
+      );
+    }
+  }
+);
+
+export const updateUserStatus = createAsyncThunk(
+  "jobs/updateUserStatus",
+  async (
+    { userId, status }: { userId: string; status: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.patch(`/admin/users/${userId}/status`, {
+        status,
+      });
+      return response.data.user;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to update user status"
+      );
+    }
+  }
+);
+
+export const deleteUser = createAsyncThunk(
+  "jobs/deleteUser",
+  async (userId: string, { rejectWithValue }) => {
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      return userId;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to delete user"
+      );
+    }
+  }
+);
+
+export const updateUserProfile = createAsyncThunk(
+  "jobs/updateUserProfile",
+  async (
+    { userId, profileData }: { userId: string; profileData: any },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.put(`/user/profile/${userId}`, profileData);
+      return response.data.user;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to update user profile"
+      );
+    }
+  }
+);
+
+export const changeUserPassword = createAsyncThunk(
+  "jobs/changeUserPassword",
+  async (
+    {
+      userId,
+      currentPassword,
+      newPassword,
+    }: { userId: string; currentPassword: string; newPassword: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await api.post(`/user/change-password/${userId}`, {
+        currentPassword,
+        newPassword,
+      });
+      return response.data.message;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to change password"
+      );
+    }
+  }
+);
+
 const jobSlice = createSlice({
   name: "jobs",
   initialState,
   reducers: {
     clearError: (state) => {
       state.error = null;
+    },
+    clearCurrentJob: (state) => {
+      state.currentJob = null;
     },
   },
   extraReducers: (builder) => {
@@ -655,9 +776,93 @@ const jobSlice = createSlice({
       .addCase(fetchRecruiterAnalytics.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+      })
+      // User management
+      .addCase(createUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(createUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.users.unshift(action.payload);
+      })
+      .addCase(createUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(updateUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update the user in the state
+        state.users = state.users.map((user) =>
+          user.id === action.payload.id ? action.payload : user
+        );
+      })
+      .addCase(updateUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(updateUserStatus.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update the user status in the state
+        state.users = state.users.map((user) =>
+          user.id === action.payload.id
+            ? { ...user, status: action.payload.status }
+            : user
+        );
+      })
+      .addCase(updateUserStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(deleteUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Remove the deleted user from the state
+        state.users = state.users.filter((user) => user.id !== action.payload);
+      })
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(updateUserProfile.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update the user profile in the state
+        state.users = state.users.map((user) =>
+          user.id === action.payload.id ? action.payload : user
+        );
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(changeUserPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(changeUserPassword.fulfilled, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(changeUserPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
-export const { clearError } = jobSlice.actions;
+export const { clearError, clearCurrentJob } = jobSlice.actions;
 export default jobSlice.reducer;

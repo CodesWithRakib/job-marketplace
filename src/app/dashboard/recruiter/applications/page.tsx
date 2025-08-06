@@ -41,6 +41,21 @@ import {
   User,
   Briefcase,
   FileText,
+  Calendar,
+  Building,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  UserCheck,
+  UserX,
+  AlertCircle,
+  CheckCircle,
+  Hourglass,
+  XCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +68,9 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Pagination } from "@/components/common/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 
 export default function RecruiterApplicationsPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -64,6 +82,10 @@ export default function RecruiterApplicationsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [mounted, setMounted] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: "ascending" | "descending";
+  } | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -80,6 +102,34 @@ export default function RecruiterApplicationsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
+
+  // Sorting function
+  const requestSort = (key: string) => {
+    let direction: "ascending" | "descending" = "ascending";
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "ascending"
+    ) {
+      direction = "descending";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Apply sorting to applications
+  const getSortedApplications = (applications: any[]) => {
+    if (!sortConfig) return applications;
+
+    return [...applications].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+      return 0;
+    });
+  };
 
   // Filter applications based on search term and status
   const filteredApplications = recruiterApplications?.filter((application) => {
@@ -98,12 +148,15 @@ export default function RecruiterApplicationsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Apply sorting
+  const sortedApplications = getSortedApplications(filteredApplications || []);
+
   // Pagination
   const totalPages = Math.ceil(
-    (filteredApplications?.length || 0) / itemsPerPage
+    (sortedApplications?.length || 0) / itemsPerPage
   );
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentApplications = filteredApplications?.slice(
+  const currentApplications = sortedApplications?.slice(
     startIndex,
     startIndex + itemsPerPage
   );
@@ -123,6 +176,36 @@ export default function RecruiterApplicationsPage() {
     }
   };
 
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+      case "reviewed":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "accepted":
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+      case "rejected":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Hourglass className="h-3 w-3" />;
+      case "reviewed":
+        return <UserCheck className="h-3 w-3" />;
+      case "accepted":
+        return <CheckCircle className="h-3 w-3" />;
+      case "rejected":
+        return <XCircle className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
   const handleUpdateStatus = (applicationId: string, newStatus: string) => {
     console.log(`Updating application ${applicationId} to status ${newStatus}`);
     toast.success(`Application status updated to ${newStatus}`);
@@ -130,6 +213,17 @@ export default function RecruiterApplicationsPage() {
 
   const handleExportApplications = () => {
     toast.success("Export functionality would be implemented here");
+  };
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortConfig.direction === "ascending" ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
+    );
   };
 
   // Don't render until mounted to avoid hydration issues
@@ -142,7 +236,7 @@ export default function RecruiterApplicationsPage() {
   }
 
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800 p-4 md:p-6 rounded-xl">
       <div className="w-full">
         {/* Header */}
         <div className="mb-8">
@@ -246,7 +340,7 @@ export default function RecruiterApplicationsPage() {
           </Card>
         </div>
 
-        <Card className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
+        <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
           <CardHeader>
             <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
               <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md">
@@ -260,17 +354,20 @@ export default function RecruiterApplicationsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                 <Input
                   placeholder="Search applications..."
-                  className="pl-8 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                  className="pl-10 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-2 w-full md:w-auto">
-                <Filter className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filter:</span>
+                </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full md:w-40 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
                     <SelectValue placeholder="Filter by status" />
@@ -287,8 +384,23 @@ export default function RecruiterApplicationsPage() {
             </div>
 
             {isLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center space-x-4 p-4 border rounded-lg"
+                  >
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                    <div className="flex space-x-2">
+                      <Skeleton className="h-8 w-16" />
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <>
@@ -296,20 +408,40 @@ export default function RecruiterApplicationsPage() {
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                       <TableRow>
-                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
-                          Applicant
+                        <TableHead
+                          className="text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
+                          onClick={() => requestSort("userId.name")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Applicant {getSortIcon("userId.name")}
+                          </div>
                         </TableHead>
-                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
-                          Job
+                        <TableHead
+                          className="text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
+                          onClick={() => requestSort("jobId.title")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Job {getSortIcon("jobId.title")}
+                          </div>
                         </TableHead>
                         <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
                           Company
                         </TableHead>
-                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
-                          Status
+                        <TableHead
+                          className="text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
+                          onClick={() => requestSort("status")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Status {getSortIcon("status")}
+                          </div>
                         </TableHead>
-                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
-                          Applied
+                        <TableHead
+                          className="text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
+                          onClick={() => requestSort("createdAt")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Applied {getSortIcon("createdAt")}
+                          </div>
                         </TableHead>
                         <TableHead className="text-right text-slate-600 dark:text-slate-300 font-medium">
                           Actions
@@ -325,10 +457,24 @@ export default function RecruiterApplicationsPage() {
                           >
                             <TableCell className="font-medium text-slate-900 dark:text-white">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage
+                                    src={application.userId?.profileImage}
+                                    alt={application.userId?.name}
+                                  />
+                                  <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                    {application.userId?.name?.charAt(0)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">
+                                    {application.userId?.name}
+                                  </div>
+                                  <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                    <Mail className="h-3 w-3" />
+                                    {application.userId?.email}
+                                  </div>
                                 </div>
-                                {application.userId?.name}
                               </div>
                             </TableCell>
                             <TableCell className="text-slate-900 dark:text-white">
@@ -338,31 +484,33 @@ export default function RecruiterApplicationsPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-slate-900 dark:text-white">
-                              {application.jobId?.company}
+                              <div className="flex items-center gap-2">
+                                <Building className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                {application.jobId?.company}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={getStatusBadgeVariant(
+                                variant="outline"
+                                className={getStatusBadgeColor(
                                   application.status
                                 )}
-                                className={
-                                  application.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                    : application.status === "reviewed"
-                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                                    : application.status === "accepted"
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-                                }
                               >
-                                {application.status}
+                                <span className="flex items-center gap-1">
+                                  {getStatusIcon(application.status)}
+                                  {application.status.charAt(0).toUpperCase() +
+                                    application.status.slice(1)}
+                                </span>
                               </Badge>
                             </TableCell>
                             <TableCell className="text-slate-900 dark:text-white">
-                              {format(
-                                new Date(application.createdAt),
-                                "MMM d, yyyy"
-                              )}
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                {format(
+                                  new Date(application.createdAt),
+                                  "MMM d, yyyy"
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
@@ -396,7 +544,7 @@ export default function RecruiterApplicationsPage() {
                                     }
                                     className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
                                   >
-                                    <Check className="mr-2 h-4 w-4" />
+                                    <UserCheck className="mr-2 h-4 w-4" />
                                     Mark as Reviewed
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
@@ -420,7 +568,7 @@ export default function RecruiterApplicationsPage() {
                                     }
                                     className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
                                   >
-                                    <X className="mr-2 h-4 w-4" />
+                                    <UserX className="mr-2 h-4 w-4" />
                                     Reject Application
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -435,11 +583,27 @@ export default function RecruiterApplicationsPage() {
                             className="text-center py-12 text-slate-500 dark:text-slate-400"
                           >
                             <div className="flex flex-col items-center justify-center gap-2">
-                              <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
-                              <p>
-                                No applications found matching your criteria.
-                                Try adjusting your filters.
+                              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                                <AlertCircle className="h-8 w-8 text-gray-400" />
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                                No applications found
+                              </h3>
+                              <p className="text-gray-500 dark:text-gray-400 max-w-md">
+                                No applications match your search criteria. Try
+                                adjusting your filters or search terms.
                               </p>
+                              <div className="flex gap-2 mt-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSearchTerm("");
+                                    setStatusFilter("all");
+                                  }}
+                                >
+                                  Clear Filters
+                                </Button>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -447,7 +611,6 @@ export default function RecruiterApplicationsPage() {
                     </TableBody>
                   </Table>
                 </div>
-
                 {totalPages > 1 && (
                   <Pagination
                     totalPages={totalPages}

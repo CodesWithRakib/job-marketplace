@@ -11,7 +11,13 @@ export async function DELETE(
   try {
     const token = await getToken({ req: request });
     if (!token?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized",
+        },
+        { status: 401 }
+      );
     }
 
     await dbConnect();
@@ -25,6 +31,7 @@ export async function DELETE(
     if (!savedJob) {
       return NextResponse.json(
         {
+          success: false,
           error:
             "Saved job not found or you don't have permission to delete it",
         },
@@ -33,12 +40,17 @@ export async function DELETE(
     }
 
     return NextResponse.json({
+      success: true,
       message: "Job removed from saved jobs",
+      deletedId: params.id,
     });
   } catch (error: any) {
     console.error("Error deleting saved job:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete saved job" },
+      {
+        success: false,
+        error: error.message || "Failed to delete saved job",
+      },
       { status: 500 }
     );
   }

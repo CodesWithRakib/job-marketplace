@@ -13,6 +13,11 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  LifeBuoy,
+  Server,
+  FileEdit,
+  PieChart,
+  Building,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -22,14 +27,114 @@ import { Badge } from "@/components/ui/badge";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard/admin", icon: BarChart3 },
-  { name: "Users", href: "/dashboard/admin/users", icon: Users },
-  { name: "Jobs", href: "/dashboard/admin/jobs", icon: Briefcase },
+  {
+    name: "Users",
+    href: "/dashboard/admin/users",
+    icon: Users,
+    children: [
+      { name: "All Users", href: "/dashboard/admin/users" },
+      { name: "Recruiters", href: "/dashboard/admin/users/recruiters" },
+      { name: "Candidates", href: "/dashboard/admin/users/candidates" },
+      { name: "Admins", href: "/dashboard/admin/users/admins" },
+      { name: "New User", href: "/dashboard/admin/users/new" },
+    ],
+  },
+  {
+    name: "Jobs",
+    href: "/dashboard/admin/jobs",
+    icon: Briefcase,
+    children: [
+      { name: "All Jobs", href: "/dashboard/admin/jobs" },
+      { name: "Active Jobs", href: "/dashboard/admin/jobs/active" },
+      { name: "Pending Approval", href: "/dashboard/admin/jobs/pending" },
+      { name: "Expired Jobs", href: "/dashboard/admin/jobs/expired" },
+      { name: "Job Categories", href: "/dashboard/admin/jobs/categories" },
+    ],
+  },
   {
     name: "Applications",
     href: "/dashboard/admin/applications",
     icon: FileText,
+    children: [
+      { name: "All Applications", href: "/dashboard/admin/applications" },
+      { name: "Pending Review", href: "/dashboard/admin/applications/pending" },
+      {
+        name: "Shortlisted",
+        href: "/dashboard/admin/applications/shortlisted",
+      },
+      { name: "Rejected", href: "/dashboard/admin/applications/rejected" },
+    ],
   },
-  { name: "Settings", href: "/dashboard/admin/settings", icon: Settings },
+  {
+    name: "Companies",
+    href: "/dashboard/admin/companies",
+    icon: Building,
+    children: [
+      { name: "All Companies", href: "/dashboard/admin/companies" },
+      { name: "Verified", href: "/dashboard/admin/companies/verified" },
+      {
+        name: "Pending Verification",
+        href: "/dashboard/admin/companies/pending",
+      },
+      { name: "New Company", href: "/dashboard/admin/companies/new" },
+    ],
+  },
+  {
+    name: "Reports",
+    href: "/dashboard/admin/reports",
+    icon: PieChart,
+    children: [
+      { name: "User Activity", href: "/dashboard/admin/reports/activity" },
+      { name: "Job Statistics", href: "/dashboard/admin/reports/jobs" },
+      {
+        name: "Application Rates",
+        href: "/dashboard/admin/reports/applications",
+      },
+      { name: "Revenue", href: "/dashboard/admin/reports/revenue" },
+    ],
+  },
+  {
+    name: "Site Content",
+    href: "/dashboard/admin/content",
+    icon: FileEdit,
+    children: [
+      { name: "Pages", href: "/dashboard/admin/content/pages" },
+      { name: "Blog", href: "/dashboard/admin/content/blog" },
+      { name: "FAQs", href: "/dashboard/admin/content/faqs" },
+      { name: "Email Templates", href: "/dashboard/admin/content/emails" },
+    ],
+  },
+  {
+    name: "System",
+    href: "/dashboard/admin/system",
+    icon: Server,
+    children: [
+      { name: "Configuration", href: "/dashboard/admin/system/config" },
+      { name: "API Keys", href: "/dashboard/admin/system/api" },
+      { name: "Logs", href: "/dashboard/admin/system/logs" },
+      { name: "Backups", href: "/dashboard/admin/system/backups" },
+    ],
+  },
+  {
+    name: "Settings",
+    href: "/dashboard/admin/settings",
+    icon: Settings,
+    children: [
+      { name: "General", href: "/dashboard/admin/settings/general" },
+      { name: "Payment", href: "/dashboard/admin/settings/payment" },
+      { name: "Email", href: "/dashboard/admin/settings/email" },
+      {
+        name: "Notifications",
+        href: "/dashboard/admin/settings/notifications",
+      },
+      { name: "SEO", href: "/dashboard/admin/settings/seo" },
+    ],
+  },
+  {
+    name: "Help Center",
+    href: "/dashboard/admin/help",
+    icon: LifeBuoy,
+  },
 ];
 
 interface SidebarProps {

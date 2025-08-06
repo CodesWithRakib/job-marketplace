@@ -13,6 +13,15 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  PlusCircle,
+  Users,
+  Calendar,
+  Mail,
+  Building,
+  CreditCard,
+  PieChart,
+  Share2,
+  LifeBuoy,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -20,16 +29,78 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+// const navigation = [
+//   { name: "Dashboard", href: "/dashboard/recruiter", icon: BarChart3 },
+//   { name: "Jobs", href: "/dashboard/recruiter/jobs", icon: Briefcase },
+//   {
+//     name: "Applications",
+//     href: "/dashboard/recruiter/applications",
+//     icon: FileText,
+//   },
+//   { name: "Profile", href: "/dashboard/recruiter/profile", icon: User },
+//   { name: "Settings", href: "/dashboard/recruiter/settings", icon: Settings },
+// ];
+
 const navigation = [
   { name: "Dashboard", href: "/dashboard/recruiter", icon: BarChart3 },
   { name: "Jobs", href: "/dashboard/recruiter/jobs", icon: Briefcase },
+  {
+    name: "Post New Job",
+    href: "/dashboard/recruiter/jobs/new",
+    icon: PlusCircle,
+  },
   {
     name: "Applications",
     href: "/dashboard/recruiter/applications",
     icon: FileText,
   },
+  {
+    name: "Candidate Pool",
+    href: "/dashboard/recruiter/candidates",
+    icon: Users,
+  },
+  {
+    name: "Interviews",
+    href: "/dashboard/recruiter/interviews",
+    icon: Calendar,
+    children: [
+      { name: "Schedule", href: "/dashboard/recruiter/interviews/schedule" },
+      { name: "Upcoming", href: "/dashboard/recruiter/interviews/upcoming" },
+      { name: "History", href: "/dashboard/recruiter/interviews/history" },
+    ],
+  },
+  {
+    name: "Messages",
+    href: "/dashboard/recruiter/messages",
+    icon: Mail,
+  },
+  {
+    name: "Company Profile",
+    href: "/dashboard/recruiter/company",
+    icon: Building,
+  },
   { name: "Profile", href: "/dashboard/recruiter/profile", icon: User },
+  {
+    name: "Billing & Plans",
+    href: "/dashboard/recruiter/billing",
+    icon: CreditCard,
+  },
   { name: "Settings", href: "/dashboard/recruiter/settings", icon: Settings },
+  {
+    name: "Reports & Analytics",
+    href: "/dashboard/recruiter/analytics",
+    icon: PieChart,
+  },
+  {
+    name: "Talent Network",
+    href: "/dashboard/recruiter/network",
+    icon: Share2,
+  },
+  {
+    name: "Help Center",
+    href: "/dashboard/recruiter/help",
+    icon: LifeBuoy,
+  },
 ];
 
 interface SidebarProps {
