@@ -61,10 +61,17 @@ export async function POST(request: NextRequest) {
       "title",
       "company",
       "description",
+      "responsibilities",
+      "requirements",
       "location",
       "type",
+      "experience",
       "salary",
+      "category",
+      "industry",
+      "applicationDeadline",
     ];
+
     for (const field of requiredFields) {
       if (!jobData[field]) {
         return NextResponse.json(
@@ -76,29 +83,43 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
 
-    // Process skills if provided as a comma-separated string
-    let skillsArray = [];
-    if (jobData.skills && typeof jobData.skills === "string") {
-      skillsArray = jobData.skills
+    // Process tags if provided as a comma-separated string
+    let tagsArray = [];
+    if (jobData.tags && typeof jobData.tags === "string") {
+      tagsArray = jobData.tags
         .split(",")
-        .map((skill) => skill.trim())
-        .filter((skill) => skill);
+        .map((tag: string) => tag.trim())
+        .filter((tag: string) => tag);
     }
 
-    // Create new job with the recruiter's ID from token (not from request body for security)
+    // Create new job with the recruiter's ID from token
     const newJob = await Job.create({
       title: jobData.title,
       company: jobData.company,
+      companyLogo: jobData.companyLogo || "",
+      companyWebsite: jobData.companyWebsite || "",
       description: jobData.description,
+      responsibilities: jobData.responsibilities,
+      requirements: jobData.requirements,
       location: jobData.location,
+      isRemote: jobData.isRemote || false,
       type: jobData.type,
-      salary: jobData.salary,
-      status: jobData.status || "active", // Set default status if not provided
-      applicationDeadline: jobData.applicationDeadline || null,
-      experience: jobData.experience || null,
-      skills: skillsArray,
-      recruiterId: token.id, // Use token ID for security
-      applicationCount: 0, // Initialize application count
+      experience: jobData.experience,
+      salary: jobData.salary, // This should be an object with min, max, currency, period
+      benefits: jobData.benefits || [],
+      applicationDeadline: jobData.applicationDeadline,
+      applicationMethod: jobData.applicationMethod || "platform",
+      applicationEmail: jobData.applicationEmail || "",
+      applicationUrl: jobData.applicationUrl || "",
+      status: jobData.status || "draft", // Ensure this matches the enum values
+      recruiterId: token.id,
+      category: jobData.category,
+      industry: jobData.industry,
+      tags: tagsArray,
+      featured: jobData.featured || false,
+      promotedUntil: jobData.promotedUntil || null,
+      applicationCount: 0,
+      views: 0,
     });
 
     return NextResponse.json(
@@ -110,6 +131,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: any) {
     console.error("Error creating job:", error);
+
     // Handle validation errors
     if (error.name === "ValidationError") {
       const validationErrors = Object.values(error.errors).map(
@@ -120,6 +142,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
     // Handle duplicate key errors
     if (error.code === 11000) {
       return NextResponse.json(
@@ -127,6 +150,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+
     return NextResponse.json(
       { error: error.message || "Failed to create job" },
       { status: 500 }

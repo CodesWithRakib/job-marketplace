@@ -4,7 +4,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
-  Briefcase,
   FileText,
   Bookmark,
   User,
@@ -23,7 +22,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 
 const navigation = [
   {

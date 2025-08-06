@@ -1,6 +1,7 @@
 // redux/slices/job-slice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import api from "@/lib/api";
+import { IJob } from "@/schemas/Job";
 
 // Define types
 interface RecruiterJob {
@@ -156,7 +157,7 @@ interface RecruiterAnalytics {
 }
 
 interface JobState {
-  jobs: Job[];
+  jobs: IJob[];
   users: User[];
   applications: Application[];
   isLoading: boolean;
@@ -166,7 +167,7 @@ interface JobState {
   userJobs: UserJob[];
   userApplications: UserApplication[];
   savedJobs: SavedJobItem[];
-  currentJob: any;
+  currentJob: IJob | null;
   analytics: AdminAnalytics | null;
   recruiterAnalytics: RecruiterAnalytics | null;
 }
@@ -376,7 +377,7 @@ export const applyToJob = createAsyncThunk(
 
 export const createJob = createAsyncThunk(
   "jobs/createJob",
-  async (jobData: any, { rejectWithValue }) => {
+  async (jobData: Partial<IJob>, { rejectWithValue }) => {
     try {
       const response = await api.post("/recruiter/jobs", jobData);
       return response.data.job;
