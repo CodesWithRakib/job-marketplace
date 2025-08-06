@@ -1,4 +1,3 @@
-// app/dashboard/user/jobs/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -30,32 +29,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Search,
-  Filter,
-  MapPin,
-  Clock,
-  DollarSign,
-  Bookmark,
-  Eye,
-} from "lucide-react";
+import { Search, Filter, Bookmark, Eye } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import { Pagination } from "@/components/common/pagination";
 
 export default function UserJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { userJobs, isLoading } = useSelector((state: RootState) => state.jobs);
   const { data: session } = useSession();
   const [searchTerm, setSearchTerm] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-
+  const [isMounted, setIsMounted] = useState(false);
   const itemsPerPage = 10;
 
+  // Fix hydration issue by ensuring component is mounted before rendering
   useEffect(() => {
+    setIsMounted(true);
     dispatch(fetchUserJobs());
   }, [dispatch]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, locationFilter, typeFilter]);
 
   // Filter jobs based on search term and filters
   const filteredJobs = userJobs?.filter((job) => {
@@ -64,9 +63,9 @@ export default function UserJobsPage() {
       job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation =
-      locationFilter === "" ||
+      locationFilter === "all" ||
       job.location.toLowerCase().includes(locationFilter.toLowerCase());
-    const matchesType = typeFilter === "" || job.type === typeFilter;
+    const matchesType = typeFilter === "all" || job.type === typeFilter;
     return matchesSearch && matchesLocation && matchesType;
   });
 
@@ -103,6 +102,15 @@ export default function UserJobsPage() {
     }
   };
 
+  // Don't render until component is mounted to avoid hydration issues
+  if (!isMounted) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -111,7 +119,6 @@ export default function UserJobsPage() {
           Browse and apply to job opportunities
         </p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Find Your Dream Job</CardTitle>
@@ -137,7 +144,7 @@ export default function UserJobsPage() {
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   <SelectItem value="remote">Remote</SelectItem>
                   <SelectItem value="new york">New York</SelectItem>
                   <SelectItem value="san francisco">San Francisco</SelectItem>
@@ -149,7 +156,7 @@ export default function UserJobsPage() {
                   <SelectValue placeholder="Job Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="full-time">Full Time</SelectItem>
                   <SelectItem value="part-time">Part Time</SelectItem>
                   <SelectItem value="contract">Contract</SelectItem>
@@ -158,7 +165,6 @@ export default function UserJobsPage() {
               </Select>
             </div>
           </div>
-
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -179,88 +185,66 @@ export default function UserJobsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentJobs?.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium">
-                          {job.title}
-                        </TableCell>
-                        <TableCell>{job.company}</TableCell>
-                        <TableCell>{job.location}</TableCell>
-                        <TableCell>
-                          <Badge variant={getTypeBadgeVariant(job.type)}>
-                            {job.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{job.salary}</TableCell>
-                        <TableCell>
-                          {format(new Date(job.createdAt), "MMM d, yyyy")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button size="sm" variant="outline" asChild>
-                              <Link href={`/dashboard/user/jobs/${job.id}`}>
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSaveJob(job.id)}
-                            >
-                              <Bookmark className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleApplyJob(job.id)}
-                            >
-                              Apply
-                            </Button>
-                          </div>
+                    {currentJobs?.length ? (
+                      currentJobs.map((job) => (
+                        <TableRow key={job.id}>
+                          <TableCell className="font-medium">
+                            {job.title}
+                          </TableCell>
+                          <TableCell>{job.company}</TableCell>
+                          <TableCell>{job.location}</TableCell>
+                          <TableCell>
+                            <Badge variant={getTypeBadgeVariant(job.type)}>
+                              {job.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{job.salary}</TableCell>
+                          <TableCell>
+                            {format(new Date(job.createdAt), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={`/dashboard/user/jobs/${job.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSaveJob(job.id)}
+                              >
+                                <Bookmark className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApplyJob(job.id)}
+                              >
+                                Apply
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          No jobs found matching your criteria. Try adjusting
+                          your filters.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
-
               {totalPages > 1 && (
-                <div className="flex items-center justify-end space-x-2 py-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                      const page = i + 1;
-                      return (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
+                // Import the pagination component
+                <Pagination
+                  totalPages={totalPages}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  className="mt-4"
+                />
               )}
             </>
           )}

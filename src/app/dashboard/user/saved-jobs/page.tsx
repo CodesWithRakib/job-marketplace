@@ -1,4 +1,3 @@
-// app/dashboard/user/saved-jobs/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -44,6 +43,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { Pagination } from "@/components/common/pagination";
 
 export default function UserSavedJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -53,11 +53,10 @@ export default function UserSavedJobsPage() {
   const { data: session } = useSession();
   const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [mounted, setMounted] = useState(false);
-
   const itemsPerPage = 10;
 
   // Handle hydration mismatch
@@ -71,15 +70,20 @@ export default function UserSavedJobsPage() {
     }
   }, [dispatch, session, mounted]);
 
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, locationFilter, typeFilter]);
+
   // Filter jobs based on search term and filters
   const filteredJobs = savedJobs?.filter((job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.company.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation =
-      locationFilter === "" ||
+      locationFilter === "all" ||
       job.location.toLowerCase().includes(locationFilter.toLowerCase());
-    const matchesType = typeFilter === "" || job.type === typeFilter;
+    const matchesType = typeFilter === "all" || job.type === typeFilter;
     return matchesSearch && matchesLocation && matchesType;
   });
 
@@ -161,7 +165,7 @@ export default function UserSavedJobsPage() {
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   <SelectItem value="remote">Remote</SelectItem>
                   <SelectItem value="new york">New York</SelectItem>
                   <SelectItem value="san francisco">San Francisco</SelectItem>
@@ -173,7 +177,7 @@ export default function UserSavedJobsPage() {
                   <SelectValue placeholder="Job Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="full-time">Full Time</SelectItem>
                   <SelectItem value="part-time">Part Time</SelectItem>
                   <SelectItem value="contract">Contract</SelectItem>
@@ -202,81 +206,61 @@ export default function UserSavedJobsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentJobs?.map((job) => (
-                      <TableRow key={job.id} className="dark:border-gray-700">
-                        <TableCell className="font-medium">
-                          {job.title}
-                        </TableCell>
-                        <TableCell>{job.company}</TableCell>
-                        <TableCell>{job.location}</TableCell>
-                        <TableCell>
-                          <Badge variant={getTypeBadgeVariant(job.type)}>
-                            {job.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{job.salary}</TableCell>
-                        <TableCell>
-                          {format(new Date(job.savedAt), "MMM d, yyyy")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button size="sm" variant="outline" asChild>
-                              <Link href={`/dashboard/user/jobs/${job.jobId}`}>
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUnsaveJob(job.jobId)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                    {currentJobs?.length ? (
+                      currentJobs.map((job) => (
+                        <TableRow key={job.id} className="dark:border-gray-700">
+                          <TableCell className="font-medium">
+                            {job.title}
+                          </TableCell>
+                          <TableCell>{job.company}</TableCell>
+                          <TableCell>{job.location}</TableCell>
+                          <TableCell>
+                            <Badge variant={getTypeBadgeVariant(job.type)}>
+                              {job.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{job.salary}</TableCell>
+                          <TableCell>
+                            {format(new Date(job.savedAt), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button size="sm" variant="outline" asChild>
+                                <Link
+                                  href={`/dashboard/user/jobs/${job.jobId}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUnsaveJob(job.jobId)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          No saved jobs found. Try adjusting your filters or
+                          save some jobs from the job listings.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
               {totalPages > 1 && (
-                <div className="flex items-center justify-end space-x-2 py-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                      const page = i + 1;
-                      return (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
+                <Pagination
+                  totalPages={totalPages}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  className="mt-4"
+                />
               )}
             </>
           )}

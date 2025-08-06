@@ -38,6 +38,9 @@ import {
   Download,
   Check,
   X,
+  User,
+  Briefcase,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,6 +51,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { Pagination } from "@/components/common/pagination";
 
 export default function RecruiterApplicationsPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -58,14 +63,23 @@ export default function RecruiterApplicationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-
+  const [mounted, setMounted] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
-    if (session?.user?.id) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.id && mounted) {
       dispatch(fetchRecruiterApplications(session.user.id));
     }
-  }, [dispatch, session]);
+  }, [dispatch, session, mounted]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   // Filter applications based on search term and status
   const filteredApplications = recruiterApplications?.filter((application) => {
@@ -110,197 +124,343 @@ export default function RecruiterApplicationsPage() {
   };
 
   const handleUpdateStatus = (applicationId: string, newStatus: string) => {
-    // In a real app, you would dispatch an action to update the application status
     console.log(`Updating application ${applicationId} to status ${newStatus}`);
-    alert(`Application status updated to ${newStatus}`);
+    toast.success(`Application status updated to ${newStatus}`);
   };
 
   const handleExportApplications = () => {
-    // In a real app, you would implement export functionality
-    alert("Export functionality would be implemented here");
+    toast.success("Export functionality would be implemented here");
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Applications Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage applications to your job postings
-          </p>
-        </div>
-        <Button variant="outline" onClick={handleExportApplications}>
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+  // Don't render until mounted to avoid hydration issues
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
       </div>
+    );
+  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Application List</CardTitle>
-          <CardDescription>
-            View and manage all applications to your job postings.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search applications..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+  return (
+    <div className="min-h-screen ">
+      <div className="w-full">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-2">
+                Applications Management
+              </h1>
+              <p className="text-slate-600 dark:text-slate-400 max-w-2xl">
+                Manage and review applications to your job postings with our
+                comprehensive tools
+              </p>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-40">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="reviewed">Reviewed</SelectItem>
-                  <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Button
+              variant="outline"
+              onClick={handleExportApplications}
+              className="bg-white dark:bg-slate-800 shadow-md hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
           </div>
+        </div>
 
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Applicant</TableHead>
-                      <TableHead>Job</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Applied</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentApplications?.map((application) => (
-                      <TableRow key={application.id}>
-                        <TableCell className="font-medium">
-                          {application.userId?.name}
-                        </TableCell>
-                        <TableCell>{application.jobId?.title}</TableCell>
-                        <TableCell>{application.jobId?.company}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={getStatusBadgeVariant(application.status)}
-                          >
-                            {application.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(
-                            new Date(application.createdAt),
-                            "MMM d, yyyy"
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateStatus(application.id, "reviewed")
-                                }
-                              >
-                                <Check className="mr-2 h-4 w-4" />
-                                Mark as Reviewed
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateStatus(application.id, "accepted")
-                                }
-                              >
-                                <Check className="mr-2 h-4 w-4" />
-                                Accept Application
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateStatus(application.id, "rejected")
-                                }
-                                className="text-red-600"
-                              >
-                                <X className="mr-2 h-4 w-4" />
-                                Reject Application
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-slate-800 dark:to-blue-900/20 border-blue-100 dark:border-blue-900/50 shadow-lg overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Total Applications
+              </CardTitle>
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+                {recruiterApplications?.length || 0}
+              </div>
+              <div className="flex items-center">
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                >
+                  All time
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-end space-x-2 py-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                      const page = i + 1;
-                      return (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
+          <Card className="bg-gradient-to-br from-white to-green-50 dark:from-slate-800 dark:to-green-900/20 border-green-100 dark:border-green-900/50 shadow-lg overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Pending Review
+              </CardTitle>
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <User className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+                {recruiterApplications?.filter(
+                  (app) => app.status === "pending"
+                ).length || 0}
+              </div>
+              <div className="flex items-center">
+                <Badge
+                  variant="secondary"
+                  className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                >
+                  Awaiting action
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-white to-purple-50 dark:from-slate-800 dark:to-purple-900/20 border-purple-100 dark:border-purple-900/50 shadow-lg overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Accepted
+              </CardTitle>
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Check className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+                {recruiterApplications?.filter(
+                  (app) => app.status === "accepted"
+                ).length || 0}
+              </div>
+              <div className="flex items-center">
+                <Badge
+                  variant="secondary"
+                  className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                >
+                  Successful candidates
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
+          <CardHeader>
+            <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              Application List
+            </CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              View and manage all applications to your job postings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <Input
+                  placeholder="Search applications..."
+                  className="pl-8 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <Filter className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-40 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="reviewed">Reviewed</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
+                      <TableRow>
+                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
+                          Applicant
+                        </TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
+                          Job
+                        </TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
+                          Company
+                        </TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
+                          Status
+                        </TableHead>
+                        <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
+                          Applied
+                        </TableHead>
+                        <TableHead className="text-right text-slate-600 dark:text-slate-300 font-medium">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentApplications?.length ? (
+                        currentApplications.map((application) => (
+                          <TableRow
+                            key={application.id}
+                            className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          >
+                            <TableCell className="font-medium text-slate-900 dark:text-white">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                {application.userId?.name}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-slate-900 dark:text-white">
+                              <div className="flex items-center gap-2">
+                                <Briefcase className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                {application.jobId?.title}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-slate-900 dark:text-white">
+                              {application.jobId?.company}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={getStatusBadgeVariant(
+                                  application.status
+                                )}
+                                className={
+                                  application.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                    : application.status === "reviewed"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                    : application.status === "accepted"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                                }
+                              >
+                                {application.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-slate-900 dark:text-white">
+                              {format(
+                                new Date(application.createdAt),
+                                "MMM d, yyyy"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                  >
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg"
+                                >
+                                  <DropdownMenuLabel className="text-slate-900 dark:text-white">
+                                    Actions
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="bg-slate-200 dark:bg-slate-700" />
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleUpdateStatus(
+                                        application.id,
+                                        "reviewed"
+                                      )
+                                    }
+                                    className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
+                                  >
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Mark as Reviewed
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleUpdateStatus(
+                                        application.id,
+                                        "accepted"
+                                      )
+                                    }
+                                    className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
+                                  >
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Accept Application
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleUpdateStatus(
+                                        application.id,
+                                        "rejected"
+                                      )
+                                    }
+                                    className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
+                                  >
+                                    <X className="mr-2 h-4 w-4" />
+                                    Reject Application
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center py-12 text-slate-500 dark:text-slate-400"
+                          >
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
+                              <p>
+                                No applications found matching your criteria.
+                                Try adjusting your filters.
+                              </p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+
+                {totalPages > 1 && (
+                  <Pagination
+                    totalPages={totalPages}
+                    currentPage={currentPage}
+                    onPageChange={setCurrentPage}
+                    className="mt-6"
+                  />
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

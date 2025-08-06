@@ -38,21 +38,19 @@ import {
   Bar,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-
 export default function AdminDashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { analytics, isLoading } = useSelector((state: RootState) => state.jobs);
+  const { analytics, isLoading } = useSelector(
+    (state: RootState) => state.jobs
+  );
   const [timeRange, setTimeRange] = useState("30");
-
   useEffect(() => {
     dispatch(fetchAdminAnalytics(timeRange));
   }, [dispatch, timeRange]);
-
   const handleExportData = () => {
     // Functionality to export analytics data
     alert("Export functionality would be implemented here");
   };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -60,7 +58,6 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
-
   if (!analytics) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -70,42 +67,37 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
-
   // Prepare data for charts
   const userGrowthData = analytics.users.growth.map((item: any) => ({
     date: item._id,
     users: item.count,
   }));
-
   const jobGrowthData = analytics.jobs.growth.map((item: any) => ({
     date: item._id,
     jobs: item.count,
   }));
-
-  const applicationGrowthData = analytics.applications.growth.map((item: any) => ({
-    date: item._id,
-    applications: item.count,
-  }));
-
+  const applicationGrowthData = analytics.applications.growth.map(
+    (item: any) => ({
+      date: item._id,
+      applications: item.count,
+    })
+  );
   const roleDistributionData = analytics.roleDistribution.map((item: any) => ({
     name: item._id,
     value: item.count,
   }));
-
-  const jobTypeDistributionData = analytics.jobTypeDistribution.map((item: any) => ({
-    name: item._id,
-    value: item.count,
-  }));
-
-  const applicationStatusDistributionData = analytics.applicationStatusDistribution.map(
+  const jobTypeDistributionData = analytics.jobTypeDistribution.map(
     (item: any) => ({
       name: item._id,
       value: item.count,
     })
   );
-
+  const applicationStatusDistributionData =
+    analytics.applicationStatusDistribution.map((item: any) => ({
+      name: item._id,
+      value: item.count,
+    }));
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -129,7 +121,6 @@ export default function AdminDashboardPage() {
           </Button>
         </div>
       </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -162,7 +153,9 @@ export default function AdminDashboardPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.applications.total}</div>
+            <div className="text-2xl font-bold">
+              {analytics.applications.total}
+            </div>
             <p className="text-xs text-muted-foreground">
               {analytics.applications.new} new in the last {timeRange} days
             </p>
@@ -170,12 +163,16 @@ export default function AdminDashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Recruiters</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Recruiters
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analytics.roleDistribution.find((r: any) => r._id === "recruiter")?.count || 0}
+              {analytics.roleDistribution.find(
+                (r: any) => r._id === "recruiter"
+              )?.count || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Currently active on the platform
@@ -183,7 +180,6 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Charts */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
@@ -192,13 +188,14 @@ export default function AdminDashboardPage() {
           <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="applications">Applications</TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>User Growth</CardTitle>
-                <CardDescription>New user registrations over time</CardDescription>
+                <CardDescription>
+                  New user registrations over time
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -218,7 +215,6 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Job Postings</CardTitle>
@@ -242,11 +238,12 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Application Trends</CardTitle>
-                <CardDescription>Application submissions over time</CardDescription>
+                <CardDescription>
+                  Application submissions over time
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -266,11 +263,12 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>User Role Distribution</CardTitle>
-                <CardDescription>Distribution of user roles on the platform</CardDescription>
+                <CardDescription>
+                  Distribution of user roles on the platform
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -283,10 +281,15 @@ export default function AdminDashboardPage() {
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {roleDistributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -296,13 +299,14 @@ export default function AdminDashboardPage() {
             </Card>
           </div>
         </TabsContent>
-
         <TabsContent value="users" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>User Growth</CardTitle>
-                <CardDescription>Detailed view of user registrations</CardDescription>
+                <CardDescription>
+                  Detailed view of user registrations
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -317,7 +321,6 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>User Role Distribution</CardTitle>
@@ -334,10 +337,15 @@ export default function AdminDashboardPage() {
                       outerRadius={120}
                       fill="#8884d8"
                       dataKey="count"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {roleDistributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -346,7 +354,6 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>User Statistics</CardTitle>
@@ -366,20 +373,27 @@ export default function AdminDashboardPage() {
                   <p className="text-3xl font-bold">
                     {Math.round(analytics.users.total * 0.75)}
                   </p>
-                  <p className="text-sm text-gray-600">Approximately 75% of total users</p>
+                  <p className="text-sm text-gray-600">
+                    Approximately 75% of total users
+                  </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold">User Growth Rate</h3>
                   <p className="text-3xl font-bold">
-                    {((analytics.users.new / analytics.users.total) * 100).toFixed(1)}%
+                    {(
+                      (analytics.users.new / analytics.users.total) *
+                      100
+                    ).toFixed(1)}
+                    %
                   </p>
-                  <p className="text-sm text-gray-600">Growth in the last {timeRange} days</p>
+                  <p className="text-sm text-gray-600">
+                    Growth in the last {timeRange} days
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="jobs" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -400,7 +414,6 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Job Type Distribution</CardTitle>
@@ -417,10 +430,15 @@ export default function AdminDashboardPage() {
                       outerRadius={120}
                       fill="#8884d8"
                       dataKey="count"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {jobTypeDistributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -429,7 +447,6 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Job Statistics</CardTitle>
@@ -449,26 +466,35 @@ export default function AdminDashboardPage() {
                   <p className="text-3xl font-bold">
                     {Math.round(analytics.jobs.total * 0.8)}
                   </p>
-                  <p className="text-sm text-gray-600">Approximately 80% of total jobs</p>
+                  <p className="text-sm text-gray-600">
+                    Approximately 80% of total jobs
+                  </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold">Job Growth Rate</h3>
                   <p className="text-3xl font-bold">
-                    {((analytics.jobs.new / analytics.jobs.total) * 100).toFixed(1)}%
+                    {(
+                      (analytics.jobs.new / analytics.jobs.total) *
+                      100
+                    ).toFixed(1)}
+                    %
                   </p>
-                  <p className="text-sm text-gray-600">Growth in the last {timeRange} days</p>
+                  <p className="text-sm text-gray-600">
+                    Growth in the last {timeRange} days
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="applications" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Application Trends</CardTitle>
-                <CardDescription>Detailed view of application submissions</CardDescription>
+                <CardDescription>
+                  Detailed view of application submissions
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -483,11 +509,12 @@ export default function AdminDashboardPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Application Status Distribution</CardTitle>
-                <CardDescription>Breakdown of application statuses</CardDescription>
+                <CardDescription>
+                  Breakdown of application statuses
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -500,10 +527,15 @@ export default function AdminDashboardPage() {
                       outerRadius={120}
                       fill="#8884d8"
                       dataKey="count"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {applicationStatusDistributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -512,7 +544,6 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Application Statistics</CardTitle>
@@ -522,24 +553,37 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold">Total Applications</h3>
-                  <p className="text-3xl font-bold">{analytics.applications.total}</p>
+                  <p className="text-3xl font-bold">
+                    {analytics.applications.total}
+                  </p>
                   <p className="text-sm text-gray-600">
-                    {analytics.applications.new} new in the last {timeRange} days
+                    {analytics.applications.new} new in the last {timeRange}{" "}
+                    days
                   </p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold">Accepted Applications</h3>
+                  <h3 className="text-lg font-semibold">
+                    Accepted Applications
+                  </h3>
                   <p className="text-3xl font-bold">
-                    {applicationStatusDistributionData.find((s: any) => s._id === "accepted")?.count || 0}
+                    {applicationStatusDistributionData.find(
+                      (s: any) => s._id === "accepted"
+                    )?.count || 0}
                   </p>
-                  <p className="text-sm text-gray-600">Successfully hired candidates</p>
+                  <p className="text-sm text-gray-600">
+                    Successfully hired candidates
+                  </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold">Application Rate</h3>
                   <p className="text-3xl font-bold">
-                    {(analytics.applications.total / analytics.jobs.total).toFixed(1)}
+                    {(
+                      analytics.applications.total / analytics.jobs.total
+                    ).toFixed(1)}
                   </p>
-                  <p className="text-sm text-gray-600">Average applications per job</p>
+                  <p className="text-sm text-gray-600">
+                    Average applications per job
+                  </p>
                 </div>
               </div>
             </CardContent>
