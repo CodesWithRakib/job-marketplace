@@ -56,7 +56,7 @@ export default function JobDetailsPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { data: session } = useSession();
   const { theme } = useTheme();
-  
+
   // Updated to match the store structure
   const { entities: jobEntities, ui: jobUI } = useSelector(
     (state: RootState) => state.jobs
@@ -64,43 +64,43 @@ export default function JobDetailsPage() {
   const { savedJobs, ui: applicationUI } = useSelector(
     (state: RootState) => state.applications
   );
-  
+
   const [isApplying, setIsApplying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
+
   // Get current job from entities
   const currentJob = jobEntities[jobId];
-  
+
   // Handle hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   useEffect(() => {
     if (jobId && mounted) {
       dispatch(fetchJobById(jobId));
-      
+
       // Fetch saved jobs when user is logged in
       if (session?.user?.id) {
         dispatch(fetchSavedJobs(session.user.id));
       }
     }
   }, [dispatch, jobId, mounted, session]);
-  
+
   // Check if job is saved
   const isJobSaved = Object.values(savedJobs).some(
     (savedJob) => savedJob.jobId === jobId
   );
-  
+
   const handleApply = async () => {
     if (!session?.user?.id) {
       toast.error("You must be logged in to apply for a job");
       return;
     }
-    
+
     // If application method is not platform, redirect accordingly
     if (
       currentJob?.applicationMethod === "email" &&
@@ -112,17 +112,21 @@ export default function JobDetailsPage() {
       );
       return;
     }
-    
-    if (currentJob?.applicationMethod === "url" && currentJob?.applicationUrl) {
+
+    // Updated to match schema: changed from "url" to "external"
+    if (
+      currentJob?.applicationMethod === "external" &&
+      currentJob?.applicationUrl
+    ) {
       window.open(currentJob.applicationUrl, "_blank");
       return;
     }
-    
+
     if (!showApplicationForm) {
       setShowApplicationForm(true);
       return;
     }
-    
+
     setIsApplying(true);
     try {
       await dispatch(
@@ -141,13 +145,13 @@ export default function JobDetailsPage() {
       setIsApplying(false);
     }
   };
-  
+
   const handleSaveJob = async () => {
     if (!session?.user?.id) {
       toast.error("You must be logged in to save a job");
       return;
     }
-    
+
     setIsSaving(true);
     try {
       if (isJobSaved) {
@@ -155,7 +159,7 @@ export default function JobDetailsPage() {
         const savedJobEntry = Object.entries(savedJobs).find(
           ([_, savedJob]) => savedJob.jobId === jobId
         );
-        
+
         if (savedJobEntry) {
           const savedJobId = savedJobEntry[0];
           await dispatch(unsaveJob(savedJobId)).unwrap();
@@ -176,7 +180,7 @@ export default function JobDetailsPage() {
       setIsSaving(false);
     }
   };
-  
+
   const getTypeBadgeVariant = (type: string) => {
     switch (type) {
       case "full-time":
@@ -191,7 +195,7 @@ export default function JobDetailsPage() {
         return "outline";
     }
   };
-  
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -210,31 +214,13 @@ export default function JobDetailsPage() {
             Filled
           </Badge>
         );
+      case "closed":
+        return <Badge variant="destructive">Closed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-  
-  // Format salary for display
-  const formatSalary = (salary) => {
-    if (!salary) return "Negotiable";
-    const currencySymbols: Record<string, string> = {
-      USD: "$",
-      EUR: "€",
-      GBP: "£",
-      CAD: "C$",
-      AUD: "A$",
-      INR: "₹",
-    };
-    const symbol = currencySymbols[salary.currency] || salary.currency;
-    if (salary.min === salary.max) {
-      return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
-    }
-    return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
-      salary.period
-    }`;
-  };
-  
+
   // Don't render anything until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
@@ -243,7 +229,7 @@ export default function JobDetailsPage() {
       </div>
     );
   }
-  
+
   if (jobUI.isLoading) {
     return (
       <div className="max-w-4xl mx-auto flex justify-center items-center h-64">
@@ -251,7 +237,7 @@ export default function JobDetailsPage() {
       </div>
     );
   }
-  
+
   if (!currentJob) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -267,10 +253,10 @@ export default function JobDetailsPage() {
       </div>
     );
   }
-  
+
   const isPromoted =
     currentJob.promotedUntil && new Date(currentJob.promotedUntil) > new Date();
-  
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
@@ -552,7 +538,7 @@ export default function JobDetailsPage() {
               </div>
               <div className="flex items-center">
                 <DollarSign className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
-                <span>{formatSalary(currentJob.salary)}</span>
+                <span>{currentJob.formattedSalary}</span>
               </div>
               <div className="flex items-center">
                 <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
@@ -568,6 +554,11 @@ export default function JobDetailsPage() {
                     {format(
                       new Date(currentJob.applicationDeadline),
                       "MMM d, yyyy"
+                    )}
+                    {currentJob.daysUntilDeadline !== undefined && (
+                      <span className="ml-2 text-sm">
+                        ({currentJob.daysUntilDeadline} days left)
+                      </span>
                     )}
                   </span>
                 </div>
@@ -616,7 +607,8 @@ export default function JobDetailsPage() {
                   </p>
                 </div>
               )}
-              {currentJob.applicationMethod === "url" && (
+              {/* Updated to match schema: changed from "url" to "external" */}
+              {currentJob.applicationMethod === "external" && (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Apply on the company website
@@ -640,8 +632,8 @@ export default function JobDetailsPage() {
                 onClick={handleSaveJob}
                 disabled={isSaving}
               >
-                <Bookmark 
-                  className={`mr-2 h-4 w-4 ${isJobSaved ? "fill-current" : ""}`} 
+                <Bookmark
+                  className={`mr-2 h-4 w-4 ${isJobSaved ? "fill-current" : ""}`}
                 />
                 {isSaving ? "Saving..." : isJobSaved ? "Saved" : "Save Job"}
               </Button>

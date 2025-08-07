@@ -263,26 +263,6 @@ export default function UserJobsPage() {
     }
   };
 
-  // Format salary for display
-  const formatSalary = (salary: ISalary) => {
-    if (!salary) return "Negotiable";
-    const currencySymbols: Record<string, string> = {
-      USD: "$",
-      EUR: "€",
-      GBP: "£",
-      CAD: "C$",
-      AUD: "A$",
-      INR: "₹",
-    };
-    const symbol = currencySymbols[salary.currency] || salary.currency;
-    if (salary.min === salary.max) {
-      return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
-    }
-    return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
-      salary.period
-    }`;
-  };
-
   // Get unique categories for filter
   const categories = [
     ...new Set(userJobs?.map((job) => job.category).filter(Boolean) || []),
@@ -507,7 +487,6 @@ export default function UserJobsPage() {
                   <div className="flex space-x-2">
                     <Skeleton className="h-8 w-16" />
                     <Skeleton className="h-8 w-16" />
-                    <Skeleton className="h-8 w-16" />
                   </div>
                 </div>
               ))}
@@ -599,7 +578,7 @@ export default function UserJobsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">
-                            {formatSalary(job.salary)}
+                            {job.formattedSalary}
                           </TableCell>
                           <TableCell className="text-gray-500 dark:text-gray-400">
                             {format(new Date(job.createdAt), "MMM d, yyyy")}

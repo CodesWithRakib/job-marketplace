@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import { fetchUserApplications } from "@/redux/slices/applicationSlice";
+import { fetchJobById } from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
@@ -44,6 +45,7 @@ import {
   User,
   ArrowLeft,
   X,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -51,13 +53,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function UserApplicationsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { userApplications, isLoading } = useSelector(
+  const { data: session } = useSession();
+
+  // Updated to get data from the applications slice
+  const {
+    entities: applicationEntities,
+    views: applicationViews,
+    ui: applicationUI,
+  } = useSelector((state: RootState) => state.applications);
+
+  // Get job entities from the job slice
+  const { entities: jobEntities } = useSelector(
     (state: RootState) => state.jobs
   );
-  const { data: session } = useSession();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingJobIds, setLoadingJobIds] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -66,15 +79,61 @@ export default function UserApplicationsPage() {
     }
   }, [dispatch, session]);
 
+  // Get user applications from entities using views.user
+  const userApplications = applicationViews.user.map(
+    (id) => applicationEntities[id]
+  );
+
+  // Fetch job details for applications if not already loaded
+  useEffect(() => {
+    const missingJobIds = userApplications
+      .filter((application) => !jobEntities[application.jobId])
+      .map((application) => application.jobId);
+
+    // Only fetch jobs that aren't already being loaded
+    const jobsToFetch = missingJobIds.filter(
+      (jobId) => !loadingJobIds.includes(jobId)
+    );
+
+    if (jobsToFetch.length > 0) {
+      setLoadingJobIds((prev) => [...prev, ...jobsToFetch]);
+
+      jobsToFetch.forEach((jobId) => {
+        dispatch(fetchJobById(jobId))
+          .unwrap()
+          .finally(() => {
+            setLoadingJobIds((prev) => prev.filter((id) => id !== jobId));
+          });
+      });
+    }
+  }, [userApplications, jobEntities, dispatch, loadingJobIds]);
+
+  // Combine applications with their job details
+  const applicationsWithDetails = userApplications
+    .map((application) => {
+      const jobDetails = jobEntities[application.jobId];
+      return {
+        ...application,
+        jobDetails,
+      };
+    })
+    .filter((item) => item.jobDetails); // Only include items where we have job details
+
   // Filter applications based on search term and status
-  const filteredApplications = userApplications?.filter((application) => {
-    const matchesSearch =
-      application.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      application.jobCompany?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || application.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredApplications = applicationsWithDetails?.filter(
+    (application) => {
+      const matchesSearch =
+        application.jobDetails?.title
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        application.jobDetails?.company
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      const matchesStatus =
+        statusFilter === "all" || application.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    }
+  );
 
   // Pagination
   const totalPages = Math.ceil(
@@ -151,7 +210,6 @@ export default function UserApplicationsPage() {
           </Button>
         </div>
       </div>
-
       <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -202,8 +260,7 @@ export default function UserApplicationsPage() {
               </Select>
             </div>
           </div>
-
-          {isLoading ? (
+          {applicationUI.isLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div
@@ -247,55 +304,56 @@ export default function UserApplicationsPage() {
                   </TableHeader>
                   <TableBody>
                     {currentApplications?.length ? (
-                      currentApplications.map((application) => (
-                        <TableRow
-                          key={application.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-                        >
-                          <TableCell className="font-medium">
-                            <div className="font-semibold">
-                              {application.jobTitle}
-                            </div>
-                          </TableCell>
-                          <TableCell>{application.jobCompany}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getStatusBadgeColor(
-                                application.status
-                              )}
-                            >
-                              <span className="flex items-center gap-1">
-                                {getStatusIcon(application.status)}
-                                {application.status.charAt(0).toUpperCase() +
-                                  application.status.slice(1)}
-                              </span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-500 dark:text-gray-400">
-                            {format(
-                              new Date(application.createdAt),
-                              "MMM d, yyyy"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              asChild
-                              className="shadow-sm"
-                            >
-                              <Link
-                                href={`/dashboard/user/applications/${application.id}`}
-                                className="flex items-center gap-1"
+                      currentApplications.map((application) => {
+                        const job = application.jobDetails;
+                        return (
+                          <TableRow
+                            key={application.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                          >
+                            <TableCell className="font-medium">
+                              <div className="font-semibold">{job.title}</div>
+                            </TableCell>
+                            <TableCell>{job.company}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={getStatusBadgeColor(
+                                  application.status
+                                )}
                               >
-                                <Eye className="h-4 w-4" />
-                                <span className="hidden sm:inline">View</span>
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                                <span className="flex items-center gap-1">
+                                  {getStatusIcon(application.status)}
+                                  {application.status.charAt(0).toUpperCase() +
+                                    application.status.slice(1)}
+                                </span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-gray-500 dark:text-gray-400">
+                              {format(
+                                new Date(application.createdAt),
+                                "MMM d, yyyy"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="shadow-sm"
+                              >
+                                <Link
+                                  href={`/dashboard/user/applications/${application.id}`}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span className="hidden sm:inline">View</span>
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-12">
@@ -334,7 +392,6 @@ export default function UserApplicationsPage() {
                   </TableBody>
                 </Table>
               </div>
-
               {totalPages > 1 && (
                 <div className="flex items-center justify-end space-x-2 py-4">
                   <Button

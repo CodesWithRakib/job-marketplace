@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import { fetchSavedJobs, unsaveJob } from "@/redux/slices/applicationSlice";
+import { fetchJobById } from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
@@ -44,6 +45,7 @@ import {
   Calendar,
   ArrowLeft,
   X,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -54,16 +56,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function UserSavedJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { savedJobs, isLoading } = useSelector(
-    (state: RootState) => state.jobs
-  );
   const { data: session } = useSession();
   const { theme } = useTheme();
+
+  // Get data from the applications slice
+  const { savedJobs, ui: applicationUI } = useSelector(
+    (state: RootState) => state.applications
+  );
+
+  // Get job entities from the job slice
+  const { entities: jobEntities } = useSelector(
+    (state: RootState) => state.jobs
+  );
+
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [mounted, setMounted] = useState(false);
+  const [loadingJobIds, setLoadingJobIds] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   // Handle hydration mismatch
@@ -82,15 +93,55 @@ export default function UserSavedJobsPage() {
     setCurrentPage(1);
   }, [searchTerm, locationFilter, typeFilter]);
 
+  // Convert savedJobs from object to array for filtering and mapping
+  const savedJobsArray = Object.values(savedJobs);
+
+  // Fetch job details for saved jobs if not already loaded
+  useEffect(() => {
+    const missingJobIds = savedJobsArray
+      .filter((savedJob) => !jobEntities[savedJob.jobId])
+      .map((savedJob) => savedJob.jobId);
+
+    // Only fetch jobs that aren't already being loaded
+    const jobsToFetch = missingJobIds.filter(
+      (jobId) => !loadingJobIds.includes(jobId)
+    );
+
+    if (jobsToFetch.length > 0) {
+      setLoadingJobIds((prev) => [...prev, ...jobsToFetch]);
+
+      jobsToFetch.forEach((jobId) => {
+        dispatch(fetchJobById(jobId))
+          .unwrap()
+          .finally(() => {
+            setLoadingJobIds((prev) => prev.filter((id) => id !== jobId));
+          });
+      });
+    }
+  }, [savedJobsArray, jobEntities, dispatch, loadingJobIds]);
+
+  // Combine saved jobs with their job details
+  const savedJobsWithDetails = savedJobsArray
+    .map((savedJob) => {
+      const jobDetails = jobEntities[savedJob.jobId];
+      return {
+        ...savedJob,
+        jobDetails,
+      };
+    })
+    .filter((item) => item.jobDetails); // Only include items where we have job details
+
   // Filter jobs based on search term and filters
-  const filteredJobs = savedJobs?.filter((job) => {
+  const filteredJobs = savedJobsWithDetails?.filter((item) => {
+    const job = item.jobDetails;
     const matchesSearch =
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchTerm.toLowerCase());
+      job?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job?.company?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLocation =
       locationFilter === "all" ||
-      job.location.toLowerCase().includes(locationFilter.toLowerCase());
-    const matchesType = typeFilter === "all" || job.type === typeFilter;
+      job?.location?.toLowerCase().includes(locationFilter.toLowerCase()) ||
+      (locationFilter === "remote" && job?.isRemote);
+    const matchesType = typeFilter === "all" || job?.type === typeFilter;
     return matchesSearch && matchesLocation && matchesType;
   });
 
@@ -102,9 +153,9 @@ export default function UserSavedJobsPage() {
     startIndex + itemsPerPage
   );
 
-  const handleUnsaveJob = (jobId: string) => {
+  const handleUnsaveJob = (savedJobId: string) => {
     if (session?.user?.id) {
-      dispatch(unsaveJob({ userId: session.user.id, jobId }))
+      dispatch(unsaveJob(savedJobId))
         .unwrap()
         .then(() => {
           toast.success("Job removed from saved jobs");
@@ -145,6 +196,26 @@ export default function UserSavedJobsPage() {
     }
   };
 
+  // Format salary for display
+  const formatSalary = (salary) => {
+    if (!salary) return "Negotiable";
+    const currencySymbols: Record<string, string> = {
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      CAD: "C$",
+      AUD: "A$",
+      INR: "₹",
+    };
+    const symbol = currencySymbols[salary.currency] || salary.currency;
+    if (salary.min === salary.max) {
+      return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
+    }
+    return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
+      salary.period
+    }`;
+  };
+
   // Don't render anything until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
@@ -174,7 +245,6 @@ export default function UserSavedJobsPage() {
           </Button>
         </div>
       </div>
-
       <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -237,8 +307,7 @@ export default function UserSavedJobsPage() {
               </Select>
             </div>
           </div>
-
-          {isLoading ? (
+          {applicationUI.isLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div
@@ -293,58 +362,73 @@ export default function UserSavedJobsPage() {
                   </TableHeader>
                   <TableBody>
                     {currentJobs?.length ? (
-                      currentJobs.map((job) => (
-                        <TableRow
-                          key={job.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-                        >
-                          <TableCell className="font-medium">
-                            <div className="font-semibold">{job.title}</div>
-                          </TableCell>
-                          <TableCell>{job.company}</TableCell>
-                          <TableCell>{job.location}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getTypeBadgeColor(job.type)}
-                            >
-                              {job.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {job.salary}
-                          </TableCell>
-                          <TableCell className="text-gray-500 dark:text-gray-400">
-                            {format(new Date(job.savedAt), "MMM d, yyyy")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                size="sm"
+                      currentJobs.map((item) => {
+                        const job = item.jobDetails;
+                        return (
+                          <TableRow
+                            key={item.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                          >
+                            <TableCell className="font-medium">
+                              <div className="font-semibold">{job.title}</div>
+                            </TableCell>
+                            <TableCell>{job.company}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                {job.location}
+                                {job.isRemote && (
+                                  <Badge variant="outline" className="ml-2">
+                                    Remote
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
                                 variant="outline"
-                                asChild
-                                className="shadow-sm"
+                                className={getTypeBadgeColor(job.type)}
                               >
-                                <Link
-                                  href={`/dashboard/user/jobs/${job.jobId}`}
-                                  className="flex items-center gap-1"
+                                {job.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatSalary(job.salary)}
+                            </TableCell>
+                            <TableCell className="text-gray-500 dark:text-gray-400">
+                              {format(new Date(item.createdAt), "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  asChild
+                                  className="shadow-sm"
                                 >
-                                  <Eye className="h-4 w-4" />
-                                  <span className="hidden sm:inline">View</span>
-                                </Link>
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleUnsaveJob(job.jobId)}
-                                className="shadow-sm"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                                  <Link
+                                    href={`/dashboard/user/jobs/${job.id}`}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span className="hidden sm:inline">
+                                      View
+                                    </span>
+                                  </Link>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUnsaveJob(item.id)}
+                                  className="shadow-sm"
+                                  disabled={applicationUI.isLoading}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-12">
@@ -384,7 +468,6 @@ export default function UserSavedJobsPage() {
                   </TableBody>
                 </Table>
               </div>
-
               {totalPages > 1 && (
                 <Pagination
                   totalPages={totalPages}
