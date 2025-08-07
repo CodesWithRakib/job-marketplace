@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
+import { fetchUserJobs } from "@/redux/slices/jobSlice";
 import {
-  fetchUserJobs,
   fetchUserApplications,
   fetchSavedJobs,
-} from "@/redux/slices/jobSlice";
+} from "@/redux/slices/applicationSlice";
 import { useSession } from "next-auth/react";
 import {
   Card,

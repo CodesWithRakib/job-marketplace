@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
+import { fetchJobById } from "@/redux/slices/jobSlice";
 import {
-  fetchJobById,
-  applyToJob,
   saveJob,
   unsaveJob,
-} from "@/redux/slices/jobSlice";
+  applyToJob,
+  fetchSavedJobs,
+} from "@/redux/slices/applicationSlice";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,43 +54,53 @@ export default function JobDetailsPage() {
   const router = useRouter();
   const jobId = params.id as string;
   const dispatch = useDispatch<AppDispatch>();
-  const { currentJob, isLoading } = useSelector(
-    (state: RootState) => state.jobs
-  );
   const { data: session } = useSession();
   const { theme } = useTheme();
+  
+  // Updated to match the store structure
+  const { entities: jobEntities, ui: jobUI } = useSelector(
+    (state: RootState) => state.jobs
+  );
+  const { savedJobs, ui: applicationUI } = useSelector(
+    (state: RootState) => state.applications
+  );
+  
   const [isApplying, setIsApplying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [showApplicationForm, setShowApplicationForm] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   const [mounted, setMounted] = useState(false);
-
+  
+  // Get current job from entities
+  const currentJob = jobEntities[jobId];
+  
   // Handle hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
-
+  
   useEffect(() => {
     if (jobId && mounted) {
       dispatch(fetchJobById(jobId));
+      
+      // Fetch saved jobs when user is logged in
+      if (session?.user?.id) {
+        dispatch(fetchSavedJobs(session.user.id));
+      }
     }
-  }, [dispatch, jobId, mounted]);
-
-  useEffect(() => {
-    if (currentJob && session?.user?.id && mounted) {
-      // Check if job is saved
-      // In a real app, you would fetch this from the API
-      setIsSaved(false); // Default to false for now
-    }
-  }, [currentJob, session, mounted]);
-
+  }, [dispatch, jobId, mounted, session]);
+  
+  // Check if job is saved
+  const isJobSaved = Object.values(savedJobs).some(
+    (savedJob) => savedJob.jobId === jobId
+  );
+  
   const handleApply = async () => {
     if (!session?.user?.id) {
       toast.error("You must be logged in to apply for a job");
       return;
     }
-
+    
     // If application method is not platform, redirect accordingly
     if (
       currentJob?.applicationMethod === "email" &&
@@ -101,17 +112,17 @@ export default function JobDetailsPage() {
       );
       return;
     }
-
+    
     if (currentJob?.applicationMethod === "url" && currentJob?.applicationUrl) {
       window.open(currentJob.applicationUrl, "_blank");
       return;
     }
-
+    
     if (!showApplicationForm) {
       setShowApplicationForm(true);
       return;
     }
-
+    
     setIsApplying(true);
     try {
       await dispatch(
@@ -130,22 +141,26 @@ export default function JobDetailsPage() {
       setIsApplying(false);
     }
   };
-
+  
   const handleSaveJob = async () => {
     if (!session?.user?.id) {
       toast.error("You must be logged in to save a job");
       return;
     }
+    
     setIsSaving(true);
     try {
-      if (isSaved) {
-        await dispatch(
-          unsaveJob({
-            userId: session.user.id,
-            jobId,
-          })
-        ).unwrap();
-        toast.success("Job removed from saved jobs");
+      if (isJobSaved) {
+        // Find the saved job ID to unsave it
+        const savedJobEntry = Object.entries(savedJobs).find(
+          ([_, savedJob]) => savedJob.jobId === jobId
+        );
+        
+        if (savedJobEntry) {
+          const savedJobId = savedJobEntry[0];
+          await dispatch(unsaveJob(savedJobId)).unwrap();
+          toast.success("Job removed from saved jobs");
+        }
       } else {
         await dispatch(
           saveJob({
@@ -155,14 +170,13 @@ export default function JobDetailsPage() {
         ).unwrap();
         toast.success("Job saved successfully");
       }
-      setIsSaved(!isSaved);
     } catch (error: any) {
       toast.error(error.message || "Failed to save job");
     } finally {
       setIsSaving(false);
     }
   };
-
+  
   const getTypeBadgeVariant = (type: string) => {
     switch (type) {
       case "full-time":
@@ -177,7 +191,7 @@ export default function JobDetailsPage() {
         return "outline";
     }
   };
-
+  
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -200,7 +214,27 @@ export default function JobDetailsPage() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-
+  
+  // Format salary for display
+  const formatSalary = (salary) => {
+    if (!salary) return "Negotiable";
+    const currencySymbols: Record<string, string> = {
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      CAD: "C$",
+      AUD: "A$",
+      INR: "₹",
+    };
+    const symbol = currencySymbols[salary.currency] || salary.currency;
+    if (salary.min === salary.max) {
+      return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
+    }
+    return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
+      salary.period
+    }`;
+  };
+  
   // Don't render anything until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
@@ -209,15 +243,15 @@ export default function JobDetailsPage() {
       </div>
     );
   }
-
-  if (isLoading) {
+  
+  if (jobUI.isLoading) {
     return (
       <div className="max-w-4xl mx-auto flex justify-center items-center h-64">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
-
+  
   if (!currentJob) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -233,10 +267,10 @@ export default function JobDetailsPage() {
       </div>
     );
   }
-
+  
   const isPromoted =
     currentJob.promotedUntil && new Date(currentJob.promotedUntil) > new Date();
-
+  
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
@@ -284,7 +318,6 @@ export default function JobDetailsPage() {
           </div>
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="description" className="w-full">
@@ -296,7 +329,6 @@ export default function JobDetailsPage() {
               <TabsTrigger value="requirements">Requirements</TabsTrigger>
               <TabsTrigger value="company">Company</TabsTrigger>
             </TabsList>
-
             <TabsContent value="description" className="space-y-4">
               <Card>
                 <CardHeader>
@@ -308,7 +340,6 @@ export default function JobDetailsPage() {
                   </div>
                 </CardContent>
               </Card>
-
               {currentJob.benefits && currentJob.benefits.length > 0 && (
                 <Card>
                   <CardHeader>
@@ -327,7 +358,6 @@ export default function JobDetailsPage() {
                 </Card>
               )}
             </TabsContent>
-
             <TabsContent value="responsibilities" className="space-y-4">
               <Card>
                 <CardHeader>
@@ -356,7 +386,6 @@ export default function JobDetailsPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-
             <TabsContent value="requirements" className="space-y-4">
               <Card>
                 <CardHeader>
@@ -381,7 +410,6 @@ export default function JobDetailsPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-
             <TabsContent value="company" className="space-y-4">
               <Card>
                 <CardHeader>
@@ -396,6 +424,8 @@ export default function JobDetailsPage() {
                             src={currentJob.companyLogo}
                             alt={`${currentJob.company} logo`}
                             className="w-full h-full object-contain rounded-lg"
+                            width={64}
+                            height={64}
                           />
                         ) : (
                           <Building className="h-8 w-8 text-gray-400" />
@@ -425,7 +455,6 @@ export default function JobDetailsPage() {
                         )}
                       </div>
                     </div>
-
                     <div>
                       <h4 className="font-medium mb-2">
                         About {currentJob.company}
@@ -435,7 +464,6 @@ export default function JobDetailsPage() {
                         application, this would be fetched from the database.
                       </p>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <h4 className="font-medium">Location</h4>
@@ -455,7 +483,6 @@ export default function JobDetailsPage() {
               </Card>
             </TabsContent>
           </Tabs>
-
           {showApplicationForm && (
             <Card>
               <CardHeader>
@@ -498,7 +525,6 @@ export default function JobDetailsPage() {
             </Card>
           )}
         </div>
-
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -526,7 +552,7 @@ export default function JobDetailsPage() {
               </div>
               <div className="flex items-center">
                 <DollarSign className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
-                <span>{currentJob.salary}</span>
+                <span>{formatSalary(currentJob.salary)}</span>
               </div>
               <div className="flex items-center">
                 <Calendar className="h-5 w-5 text-gray-500 dark:text-gray-400 mr-2" />
@@ -552,7 +578,6 @@ export default function JobDetailsPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Application Method</CardTitle>
@@ -573,7 +598,6 @@ export default function JobDetailsPage() {
                   </Button>
                 </div>
               )}
-
               {currentJob.applicationMethod === "email" && (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -592,7 +616,6 @@ export default function JobDetailsPage() {
                   </p>
                 </div>
               )}
-
               {currentJob.applicationMethod === "url" && (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -611,19 +634,19 @@ export default function JobDetailsPage() {
                   </p>
                 </div>
               )}
-
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={handleSaveJob}
                 disabled={isSaving}
               >
-                <Bookmark className="mr-2 h-4 w-4" />
-                {isSaving ? "Saving..." : isSaved ? "Saved" : "Save Job"}
+                <Bookmark 
+                  className={`mr-2 h-4 w-4 ${isJobSaved ? "fill-current" : ""}`} 
+                />
+                {isSaving ? "Saving..." : isJobSaved ? "Saved" : "Save Job"}
               </Button>
             </CardContent>
           </Card>
-
           {currentJob.tags && currentJob.tags.length > 0 && (
             <Card>
               <CardHeader>
@@ -640,7 +663,6 @@ export default function JobDetailsPage() {
               </CardContent>
             </Card>
           )}
-
           {isPromoted && (
             <Card className="border-purple-200 dark:border-purple-900 bg-purple-50 dark:bg-purple-950/20">
               <CardContent className="pt-6">

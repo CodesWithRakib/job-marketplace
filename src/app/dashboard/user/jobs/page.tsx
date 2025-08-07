@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import { fetchUserJobs } from "@/redux/slices/jobSlice";
-import { saveJob, unsaveJob } from "@/redux/slices/applicationSlice";
+import {
+  saveJob,
+  unsaveJob,
+  fetchSavedJobs,
+} from "@/redux/slices/applicationSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
@@ -65,8 +69,18 @@ interface ISalary {
 
 export default function UserJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { userJobs, isLoading } = useSelector((state: RootState) => state.jobs);
   const { data: session } = useSession();
+
+  // Updated to match the store structure
+  const {
+    entities: jobEntities,
+    views: jobViews,
+    ui: jobUI,
+  } = useSelector((state: RootState) => state.jobs);
+  const { savedJobs, ui: applicationUI } = useSelector(
+    (state: RootState) => state.applications
+  );
+
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -77,14 +91,18 @@ export default function UserJobsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isMounted, setIsMounted] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [savedJobs, setSavedJobs] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   // Fix hydration issue by ensuring component is mounted before rendering
   useEffect(() => {
     setIsMounted(true);
     dispatch(fetchUserJobs());
-  }, [dispatch]);
+
+    // Fetch saved jobs when user is logged in
+    if (session?.user?.id) {
+      dispatch(fetchSavedJobs(session.user.id));
+    }
+  }, [dispatch, session]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -99,7 +117,8 @@ export default function UserJobsPage() {
     salaryMaxFilter,
   ]);
 
-  console.log(userJobs);
+  // Get user jobs from entities using views.user
+  const userJobs = jobViews.user.map((id) => jobEntities[id]);
 
   // Filter jobs based on search term and filters
   const filteredJobs = userJobs?.filter((job) => {
@@ -126,7 +145,6 @@ export default function UserJobsPage() {
       if (!salary) return 0;
       return salary.max; // Use max value for filtering
     };
-
     const jobSalaryValue = extractSalaryValue(job.salary);
     const matchesSalaryMin =
       !salaryMinFilter || jobSalaryValue >= parseInt(salaryMinFilter);
@@ -152,19 +170,33 @@ export default function UserJobsPage() {
     startIndex + itemsPerPage
   );
 
+  // Check if a job is saved
+  const isJobSaved = (jobId: string) => {
+    return Object.values(savedJobs).some(
+      (savedJob) => savedJob.jobId === jobId
+    );
+  };
+
   const handleSaveJob = async (jobId: string) => {
     if (!session?.user?.id) {
       toast.error("You must be logged in to save a job");
       return;
     }
+
     try {
-      if (savedJobs.includes(jobId)) {
-        await dispatch(unsaveJob({ userId: session.user.id, jobId })).unwrap();
-        setSavedJobs(savedJobs.filter((id) => id !== jobId));
-        toast.success("Job removed from saved jobs");
+      if (isJobSaved(jobId)) {
+        // Find the saved job ID to unsave it
+        const savedJobEntry = Object.entries(savedJobs).find(
+          ([_, savedJob]) => savedJob.jobId === jobId
+        );
+
+        if (savedJobEntry) {
+          const savedJobId = savedJobEntry[0];
+          await dispatch(unsaveJob(savedJobId)).unwrap();
+          toast.success("Job removed from saved jobs");
+        }
       } else {
         await dispatch(saveJob({ userId: session.user.id, jobId })).unwrap();
-        setSavedJobs([...savedJobs, jobId]);
         toast.success("Job saved successfully");
       }
     } catch (error: any) {
@@ -234,7 +266,6 @@ export default function UserJobsPage() {
   // Format salary for display
   const formatSalary = (salary: ISalary) => {
     if (!salary) return "Negotiable";
-
     const currencySymbols: Record<string, string> = {
       USD: "$",
       EUR: "€",
@@ -243,13 +274,10 @@ export default function UserJobsPage() {
       AUD: "A$",
       INR: "₹",
     };
-
     const symbol = currencySymbols[salary.currency] || salary.currency;
-
     if (salary.min === salary.max) {
       return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
     }
-
     return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
       salary.period
     }`;
@@ -289,7 +317,6 @@ export default function UserJobsPage() {
           </Button>
         </div>
       </div>
-
       <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -335,7 +362,6 @@ export default function UserJobsPage() {
               )}
             </Button>
           </div>
-
           {showAdvancedFilters && (
             <Card className="mb-6 border border-gray-200 dark:border-gray-700">
               <CardContent className="pt-6">
@@ -467,8 +493,7 @@ export default function UserJobsPage() {
               </CardContent>
             </Card>
           )}
-
-          {isLoading ? (
+          {jobUI.isLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div
@@ -600,16 +625,15 @@ export default function UserJobsPage() {
                                 variant="outline"
                                 onClick={() => handleSaveJob(job.id)}
                                 className={`shadow-sm ${
-                                  savedJobs.includes(job.id)
+                                  isJobSaved(job.id)
                                     ? "bg-blue-50 text-blue-700 border-blue-200"
                                     : ""
                                 }`}
+                                disabled={applicationUI.isLoading}
                               >
                                 <Bookmark
                                   className={`h-4 w-4 ${
-                                    savedJobs.includes(job.id)
-                                      ? "fill-current"
-                                      : ""
+                                    isJobSaved(job.id) ? "fill-current" : ""
                                   }`}
                                 />
                               </Button>

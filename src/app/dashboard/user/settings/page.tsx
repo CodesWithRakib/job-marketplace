@@ -27,24 +27,21 @@ import {
   Save,
   RefreshCw,
   Bell,
-  Mail,
   Eye,
   Shield,
   Key,
-  Settings,
   Globe,
   Moon,
   Sun,
   Lock,
   User,
-  AlertTriangle,
   CheckCircle,
   Smartphone,
   Monitor,
   Tablet,
   LogOut,
   Fingerprint,
-  SmartphoneNfc
+  SmartphoneNfc,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -96,7 +93,7 @@ export default function UserSettingsPage() {
     {
       id: "current",
       device: "Current Session",
-      browser: navigator.userAgent.split(' ').slice(-3).join(' '),
+      browser: navigator.userAgent.split(" ").slice(-3).join(" "),
       location: "New York, USA",
       isActive: true,
       isCurrent: true,
@@ -150,7 +147,7 @@ export default function UserSettingsPage() {
       toast.error("New passwords do not match");
       return;
     }
-    
+
     setIsChangingPassword(true);
     try {
       // In a real app, you would implement password change functionality
@@ -178,7 +175,9 @@ export default function UserSettingsPage() {
 
   const handleToggleTwoFactor = () => {
     setTwoFactorEnabled(!twoFactorEnabled);
-    toast.success(`Two-factor authentication ${!twoFactorEnabled ? 'enabled' : 'disabled'}`);
+    toast.success(
+      `Two-factor authentication ${!twoFactorEnabled ? "enabled" : "disabled"}`
+    );
   };
 
   const handleTerminateSession = (id: string) => {
@@ -186,8 +185,8 @@ export default function UserSettingsPage() {
       toast.error("Cannot terminate current session");
       return;
     }
-    
-    setActiveSessions(activeSessions.filter(session => session.id !== id));
+
+    setActiveSessions(activeSessions.filter((session) => session.id !== id));
     toast.success("Session terminated successfully");
   };
 
@@ -232,12 +231,15 @@ export default function UserSettingsPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Reset Settings</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to reset all settings to default? This action cannot be undone.
+                  Are you sure you want to reset all settings to default? This
+                  action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleResetSettings}>Reset</AlertDialogAction>
+                <AlertDialogAction onClick={handleResetSettings}>
+                  Reset
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -527,55 +529,81 @@ export default function UserSettingsPage() {
                     <Label htmlFor="currentPassword" className="font-medium">
                       Current Password
                     </Label>
-                    <Input 
-                      id="currentPassword" 
+                    <Input
+                      id="currentPassword"
                       type="password"
                       value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                      onChange={(e) =>
+                        setPasswordData({
+                          ...passwordData,
+                          currentPassword: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="newPassword" className="font-medium">
                       New Password
                     </Label>
-                    <Input 
-                      id="newPassword" 
+                    <Input
+                      id="newPassword"
                       type="password"
                       value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                      onChange={(e) =>
+                        setPasswordData({
+                          ...passwordData,
+                          newPassword: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword" className="font-medium">
                       Confirm New Password
                     </Label>
-                    <Input 
-                      id="confirmPassword" 
+                    <Input
+                      id="confirmPassword"
                       type="password"
                       value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                      onChange={(e) =>
+                        setPasswordData({
+                          ...passwordData,
+                          confirmPassword: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
-                <Button 
-                  onClick={handleChangePassword} 
+                <Button
+                  onClick={handleChangePassword}
                   className="shadow-sm"
-                  disabled={isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                  disabled={
+                    isChangingPassword ||
+                    !passwordData.currentPassword ||
+                    !passwordData.newPassword ||
+                    !passwordData.confirmPassword
+                  }
                 >
                   <Key className="mr-2 h-4 w-4" />
                   {isChangingPassword ? "Changing..." : "Change Password"}
                 </Button>
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">
                   Two-Factor Authentication
                 </h3>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${twoFactorEnabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                        twoFactorEnabled
+                          ? "bg-green-100 dark:bg-green-900/30"
+                          : "bg-gray-100 dark:bg-gray-800"
+                      }`}
+                    >
                       {twoFactorEnabled ? (
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
@@ -585,14 +613,14 @@ export default function UserSettingsPage() {
                     <div>
                       <p className="font-medium">Two-Factor Authentication</p>
                       <p className="text-sm text-muted-foreground">
-                        {twoFactorEnabled 
-                          ? "Your account is protected with 2FA" 
+                        {twoFactorEnabled
+                          ? "Your account is protected with 2FA"
                           : "Add an extra layer of security to your account"}
                       </p>
                     </div>
                   </div>
-                  <Button 
-                    variant={twoFactorEnabled ? "outline" : "default"} 
+                  <Button
+                    variant={twoFactorEnabled ? "outline" : "default"}
                     className="shadow-sm"
                     onClick={handleToggleTwoFactor}
                   >
@@ -600,14 +628,23 @@ export default function UserSettingsPage() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Active Sessions</h3>
                 <div className="space-y-3">
                   {activeSessions.map((session) => (
-                    <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                       <div className="flex items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${session.isCurrent ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                            session.isCurrent
+                              ? "bg-blue-100 dark:bg-blue-900/30"
+                              : "bg-gray-100 dark:bg-gray-800"
+                          }`}
+                        >
                           {getDeviceIcon(session.device)}
                         </div>
                         <div>
@@ -619,13 +656,15 @@ export default function UserSettingsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {session.isActive && (
-                          <Badge variant={session.isCurrent ? "default" : "outline"}>
+                          <Badge
+                            variant={session.isCurrent ? "default" : "outline"}
+                          >
                             {session.isCurrent ? "Current" : "Active"}
                           </Badge>
                         )}
                         {!session.isCurrent && (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleTerminateSession(session.id)}
                             className="shadow-sm"
