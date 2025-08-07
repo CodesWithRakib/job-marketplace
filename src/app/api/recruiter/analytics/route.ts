@@ -1,47 +1,45 @@
-// app/api/recruiter/analytics/route.ts
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import { authOptions } from "@/lib/auth";
 import Job from "@/schemas/Job";
 import Application from "@/schemas/Application";
+import connectDB from "@/lib/mongodb";
+import { startOfDay, subDays } from "date-fns";
 
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect();
+    const session = await getServerSession(authOptions);
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const recruiterId = searchParams.get("recruiterId");
-    const timeRange = searchParams.get("timeRange") || "30"; // Default to 30 days
-
-    if (!recruiterId) {
-      return NextResponse.json(
-        { error: "Recruiter ID is required" },
-        { status: 400 }
-      );
+    if (
+      !session ||
+      (session.user.role !== "recruiter" && session.user.role !== "admin")
+    ) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Calculate date based on time range
-    const now = new Date();
-    const timeRangeDate = new Date();
-    timeRangeDate.setDate(now.getDate() - parseInt(timeRange));
+    const { searchParams } = new URL(request.url);
+    const timeRange = searchParams.get("timeRange") || "30";
+    const recruiterId = searchParams.get("recruiterId");
+    const days = parseInt(timeRange);
+    const startDate = startOfDay(subDays(new Date(), days));
+    const targetRecruiterId = recruiterId || session.user.id;
 
-    // Fetch job analytics for this recruiter
-    const jobs = await Job.find({ recruiterId });
-    const activeJobs = await Job.find({
-      recruiterId,
+    await connectDB();
+
+    // Job analytics
+    const totalJobs = await Job.countDocuments({
+      recruiterId: targetRecruiterId,
+    });
+    const activeJobs = await Job.countDocuments({
+      recruiterId: targetRecruiterId,
       status: "active",
     });
-    const newJobs = await Job.find({
-      recruiterId,
-      createdAt: { $gte: timeRangeDate },
-    });
 
-    // Group jobs by creation date for growth data
     const jobGrowth = await Job.aggregate([
       {
         $match: {
-          recruiterId,
-          createdAt: { $gte: timeRangeDate },
+          recruiterId: targetRecruiterId,
+          createdAt: { $gte: startDate },
         },
       },
       {
@@ -50,23 +48,29 @@ export async function GET(request: NextRequest) {
           count: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
+      {
+        $sort: { _id: 1 },
+      },
     ]);
 
-    // Fetch application analytics for this recruiter's jobs
+    // Application analytics
+    const jobs = await Job.find({ recruiterId: targetRecruiterId });
     const jobIds = jobs.map((job) => job._id);
-    const applications = await Application.find({ jobId: { $in: jobIds } });
-    const newApplications = await Application.find({
+
+    const totalApplications = await Application.countDocuments({
       jobId: { $in: jobIds },
-      createdAt: { $gte: timeRangeDate },
     });
 
-    // Group applications by creation date for growth data
+    const newApplications = await Application.countDocuments({
+      jobId: { $in: jobIds },
+      createdAt: { $gte: startDate },
+    });
+
     const applicationGrowth = await Application.aggregate([
       {
         $match: {
           jobId: { $in: jobIds },
-          createdAt: { $gte: timeRangeDate },
+          createdAt: { $gte: startDate },
         },
       },
       {
@@ -75,10 +79,11 @@ export async function GET(request: NextRequest) {
           count: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
+      {
+        $sort: { _id: 1 },
+      },
     ]);
 
-    // Get application status distribution
     const applicationStatusDistribution = await Application.aggregate([
       {
         $match: {
@@ -93,9 +98,13 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get top performing jobs (by application count)
+    // Top jobs by application count
     const topJobs = await Job.aggregate([
-      { $match: { recruiterId } },
+      {
+        $match: {
+          recruiterId: targetRecruiterId,
+        },
+      },
       {
         $lookup: {
           from: "applications",
@@ -109,31 +118,37 @@ export async function GET(request: NextRequest) {
           id: "$_id",
           title: 1,
           applicationCount: { $size: "$applications" },
-          viewCount: "$viewCount", // Assuming you have a viewCount field
+          viewCount: "$views",
         },
       },
-      { $sort: { applicationCount: -1 } },
-      { $limit: 5 },
+      {
+        $sort: { applicationCount: -1 },
+      },
+      {
+        $limit: 5,
+      },
     ]);
 
-    return NextResponse.json({
+    const analytics = {
       jobs: {
-        total: jobs.length,
-        active: activeJobs.length,
+        total: totalJobs,
+        active: activeJobs,
         growth: jobGrowth,
       },
       applications: {
-        total: applications.length,
-        new: newApplications.length,
+        total: totalApplications,
+        new: newApplications,
         growth: applicationGrowth,
       },
       applicationStatusDistribution,
       topJobs,
-    });
-  } catch (error: any) {
-    console.error("Error fetching recruiter analytics:", error);
+    };
+
+    return NextResponse.json(analytics);
+  } catch (error) {
+    console.error("Recruiter analytics fetch error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch recruiter analytics" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

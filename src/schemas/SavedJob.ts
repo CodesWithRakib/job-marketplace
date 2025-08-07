@@ -1,7 +1,15 @@
-// schemas/SavedJob.ts
-import { Schema, model, models } from "mongoose";
+import { Schema, model, models, Document, ObjectId } from "mongoose";
 
-const SavedJobSchema = new Schema(
+// SavedJob document interface
+export interface ISavedJob extends Document {
+  userId: ObjectId;
+  jobId: ObjectId;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const SavedJobSchema = new Schema<ISavedJob>(
   {
     userId: {
       type: Schema.Types.ObjectId,
@@ -13,12 +21,29 @@ const SavedJobSchema = new Schema(
       ref: "Job",
       required: true,
     },
+    notes: {
+      type: String,
+    },
   },
   {
     timestamps: true,
+    toJSON: {
+      transform: function (doc, ret) {
+        delete ret.__v;
+        return ret;
+      },
+    },
   }
 );
 
-const SavedJob = models.SavedJob || model("SavedJob", SavedJobSchema);
+// Indexes for performance
+SavedJobSchema.index({ userId: 1, jobId: 1 }, { unique: true });
+SavedJobSchema.index({ userId: 1 });
 
+// Force recompilation of model in development
+if (models.SavedJob) {
+  delete models.SavedJob;
+}
+
+const SavedJob = model<ISavedJob>("SavedJob", SavedJobSchema);
 export default SavedJob;

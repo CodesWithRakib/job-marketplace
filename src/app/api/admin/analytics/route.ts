@@ -1,32 +1,37 @@
-// app/api/admin/analytics/route.ts
+import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import { authOptions } from "@/lib/auth";
 import User from "@/schemas/User";
 import Job from "@/schemas/Job";
 import Application from "@/schemas/Application";
+import connectDB from "@/lib/mongodb";
+import { startOfDay, subDays } from "date-fns";
 
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect();
+    const session = await getServerSession(authOptions);
 
-    // Get query parameters for time range
+    if (!session || session.user.role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const timeRange = searchParams.get("timeRange") || "30"; // Default to 30 days
+    const timeRange = searchParams.get("timeRange") || "30";
+    const days = parseInt(timeRange);
+    const startDate = startOfDay(subDays(new Date(), days));
 
-    // Calculate date based on time range
-    const now = new Date();
-    const timeRangeDate = new Date();
-    timeRangeDate.setDate(now.getDate() - parseInt(timeRange));
+    await connectDB();
 
-    // Fetch user analytics
-    const users = await User.find({});
-    const newUsers = await User.find({ createdAt: { $gte: timeRangeDate } });
+    // User analytics
+    const totalUsers = await User.countDocuments();
+    const newUsers = await User.countDocuments({
+      createdAt: { $gte: startDate },
+    });
 
-    // Group users by creation date for growth data
     const userGrowth = await User.aggregate([
       {
         $match: {
-          createdAt: { $gte: timeRangeDate },
+          createdAt: { $gte: startDate },
         },
       },
       {
@@ -35,52 +40,11 @@ export async function GET(request: NextRequest) {
           count: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
+      {
+        $sort: { _id: 1 },
+      },
     ]);
 
-    // Fetch job analytics
-    const jobs = await Job.find({});
-    const newJobs = await Job.find({ createdAt: { $gte: timeRangeDate } });
-
-    // Group jobs by creation date for growth data
-    const jobGrowth = await Job.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: timeRangeDate },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // Fetch application analytics
-    const applications = await Application.find({});
-    const newApplications = await Application.find({
-      createdAt: { $gte: timeRangeDate },
-    });
-
-    // Group applications by creation date for growth data
-    const applicationGrowth = await Application.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: timeRangeDate },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // Get role distribution
     const roleDistribution = await User.aggregate([
       {
         $group: {
@@ -90,7 +54,29 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get job type distribution
+    // Job analytics
+    const totalJobs = await Job.countDocuments();
+    const newJobs = await Job.countDocuments({
+      createdAt: { $gte: startDate },
+    });
+
+    const jobGrowth = await Job.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
     const jobTypeDistribution = await Job.aggregate([
       {
         $group: {
@@ -100,7 +86,29 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get application status distribution
+    // Application analytics
+    const totalApplications = await Application.countDocuments();
+    const newApplications = await Application.countDocuments({
+      createdAt: { $gte: startDate },
+    });
+
+    const applicationGrowth = await Application.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
     const applicationStatusDistribution = await Application.aggregate([
       {
         $group: {
@@ -110,30 +118,32 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    return NextResponse.json({
+    const analytics = {
       users: {
-        total: users.length,
-        new: newUsers.length,
+        total: totalUsers,
+        new: newUsers,
         growth: userGrowth,
       },
       jobs: {
-        total: jobs.length,
-        new: newJobs.length,
+        total: totalJobs,
+        new: newJobs,
         growth: jobGrowth,
       },
       applications: {
-        total: applications.length,
-        new: newApplications.length,
+        total: totalApplications,
+        new: newApplications,
         growth: applicationGrowth,
       },
       roleDistribution,
       jobTypeDistribution,
       applicationStatusDistribution,
-    });
-  } catch (error: any) {
-    console.error("Error fetching admin analytics:", error);
+    };
+
+    return NextResponse.json(analytics);
+  } catch (error) {
+    console.error("Analytics fetch error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch admin analytics" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

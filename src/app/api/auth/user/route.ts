@@ -1,6 +1,6 @@
 // app/api/auth/user/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 import User from "@/schemas/User";
 
 export async function GET(request: NextRequest) {

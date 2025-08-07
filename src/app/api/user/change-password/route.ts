@@ -1,6 +1,6 @@
 // app/api/user/change-password/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 import User from "@/schemas/User";
 import { getToken } from "next-auth/jwt";
 import bcrypt from "bcryptjs";

@@ -1,33 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import dbConnect from "@/lib/db";
 import User from "@/schemas/User";
+import bcrypt from "bcryptjs";
+import connectDB from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Register API endpoint called");
+    await connectDB();
 
-    const body = await request.json();
-    console.log("Registration request body:", body);
-
-    const { email, password, role, fullName } = body;
-
-    if (!email || !password || !role || !fullName) {
-      console.log("Missing fields");
-      return NextResponse.json(
-        { error: "All fields are required" },
-        { status: 400 }
-      );
-    }
-
-    // Connect to database
-    await dbConnect();
-    console.log("Database connected");
+    const { email, password, name, role = "user" } = await request.json();
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log("User already exists");
       return NextResponse.json(
         { error: "User already exists" },
         { status: 400 }
@@ -36,38 +20,31 @@ export async function POST(request: NextRequest) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
-    console.log("Password hashed");
 
-    // Create user with the correct field name
+    // Create user
     const user = await User.create({
       email,
       password: hashedPassword,
+      name,
       role,
-      name: fullName, // Use 'name' to match the schema
+      status: "active",
     });
-    console.log("User created:", user);
 
-    // Return success without password
-    const userObject = user.toObject();
-    const { password: _, ...userWithoutPassword } = userObject;
+    // Return user without password
+    const userWithoutPassword = {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+      profile: user.profile,
+    };
 
-    return NextResponse.json({
-      message: "User created successfully",
-      user: userWithoutPassword,
-    });
-  } catch (error: any) {
-    console.error("Registration error in API route:", error);
-
-    // Handle Mongoose validation errors specifically
-    if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map(
-        (val: any) => val.message
-      );
-      return NextResponse.json({ error: messages.join(", ") }, { status: 400 });
-    }
-
+    return NextResponse.json({ user: userWithoutPassword }, { status: 201 });
+  } catch (error) {
+    console.error("Registration error:", error);
     return NextResponse.json(
-      { error: error.message || "Registration failed" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

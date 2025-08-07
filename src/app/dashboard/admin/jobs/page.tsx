@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchJobs } from "@/redux/slices/job-slice";
+import { fetchJobs } from "@/redux/slices/jobSlice";
 import {
   Table,
   TableBody,

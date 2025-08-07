@@ -1,6 +1,6 @@
 // app/api/recruiter/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 import User from "@/schemas/User";
 import Company from "@/schemas/Company";
 import { getToken } from "next-auth/jwt";

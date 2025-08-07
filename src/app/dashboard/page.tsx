@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/redux/store";
-import { setSession } from "@/redux/slices/auth-slice";
+import { setSession } from "@/redux/slices/authSlice";
 
 export default function DashboardPage() {
   const router = useRouter();

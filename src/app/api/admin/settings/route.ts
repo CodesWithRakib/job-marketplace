@@ -1,6 +1,6 @@
 // app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 import { getToken } from "next-auth/jwt";
 
 // This would typically interact with a Settings collection in your database

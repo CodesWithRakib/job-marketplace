@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useDispatch } from "react-redux";
-import { setSession } from "@/redux/slices/auth-slice";
+import { setSession } from "@/redux/slices/authSlice";
 
 export default function SessionSync() {
   const { data: session, status } = useSession();

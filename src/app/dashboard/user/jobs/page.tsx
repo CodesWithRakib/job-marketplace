@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchUserJobs } from "@/redux/slices/job-slice";
+import { fetchUserJobs, saveJob, unsaveJob } from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
@@ -42,11 +42,25 @@ import {
   Calendar,
   Building,
   X,
+  Star,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { Pagination } from "@/components/common/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BadgeVariant } from "@/components/ui/badge";
+import { toast } from "sonner";
+import Image from "next/image";
+
+// Define salary interface based on schema
+interface ISalary {
+  min: number;
+  max: number;
+  currency: "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "INR";
+  period: "hourly" | "monthly" | "yearly";
+}
 
 export default function UserJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -55,8 +69,14 @@ export default function UserJobsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [experienceFilter, setExperienceFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [salaryMinFilter, setSalaryMinFilter] = useState("");
+  const [salaryMaxFilter, setSalaryMaxFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isMounted, setIsMounted] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [savedJobs, setSavedJobs] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   // Fix hydration issue by ensuring component is mounted before rendering
@@ -68,19 +88,59 @@ export default function UserJobsPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, locationFilter, typeFilter]);
+  }, [
+    searchTerm,
+    locationFilter,
+    typeFilter,
+    experienceFilter,
+    categoryFilter,
+    salaryMinFilter,
+    salaryMaxFilter,
+  ]);
+
+  console.log(userJobs);
 
   // Filter jobs based on search term and filters
   const filteredJobs = userJobs?.filter((job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase());
+      job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (job.tags &&
+        job.tags.some((tag: string) =>
+          tag.toLowerCase().includes(searchTerm.toLowerCase())
+        ));
     const matchesLocation =
       locationFilter === "all" ||
+      (locationFilter === "remote" && job.isRemote) ||
       job.location.toLowerCase().includes(locationFilter.toLowerCase());
     const matchesType = typeFilter === "all" || job.type === typeFilter;
-    return matchesSearch && matchesLocation && matchesType;
+    const matchesExperience =
+      experienceFilter === "all" || job.experience === experienceFilter;
+    const matchesCategory =
+      categoryFilter === "all" || job.category === categoryFilter;
+
+    // Handle salary filtering - convert salary object to numeric value for comparison
+    const extractSalaryValue = (salary: ISalary): number => {
+      if (!salary) return 0;
+      return salary.max; // Use max value for filtering
+    };
+
+    const jobSalaryValue = extractSalaryValue(job.salary);
+    const matchesSalaryMin =
+      !salaryMinFilter || jobSalaryValue >= parseInt(salaryMinFilter);
+    const matchesSalaryMax =
+      !salaryMaxFilter || jobSalaryValue <= parseInt(salaryMaxFilter);
+
+    return (
+      matchesSearch &&
+      matchesLocation &&
+      matchesType &&
+      matchesExperience &&
+      matchesCategory &&
+      matchesSalaryMin &&
+      matchesSalaryMax
+    );
   });
 
   // Pagination
@@ -91,17 +151,27 @@ export default function UserJobsPage() {
     startIndex + itemsPerPage
   );
 
-  const handleApplyJob = (jobId: string) => {
-    // In a real app, you would navigate to the job details page or open an application modal
-    console.log("Applying to job:", jobId);
+  const handleSaveJob = async (jobId: string) => {
+    if (!session?.user?.id) {
+      toast.error("You must be logged in to save a job");
+      return;
+    }
+    try {
+      if (savedJobs.includes(jobId)) {
+        await dispatch(unsaveJob({ userId: session.user.id, jobId })).unwrap();
+        setSavedJobs(savedJobs.filter((id) => id !== jobId));
+        toast.success("Job removed from saved jobs");
+      } else {
+        await dispatch(saveJob({ userId: session.user.id, jobId })).unwrap();
+        setSavedJobs([...savedJobs, jobId]);
+        toast.success("Job saved successfully");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save job");
+    }
   };
 
-  const handleSaveJob = (jobId: string) => {
-    // In a real app, you would dispatch an action to save the job
-    console.log("Saving job:", jobId);
-  };
-
-  const getTypeBadgeVariant = (type: string) => {
+  const getTypeBadgeVariant = (type: string): BadgeVariant => {
     switch (type) {
       case "full-time":
         return "default";
@@ -111,6 +181,8 @@ export default function UserJobsPage() {
         return "outline";
       case "internship":
         return "destructive";
+      case "freelance":
+        return "outline";
       default:
         return "outline";
     }
@@ -126,10 +198,66 @@ export default function UserJobsPage() {
         return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
       case "internship":
         return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      case "freelance":
+        return "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
   };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "active":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+            Active
+          </Badge>
+        );
+      case "inactive":
+        return <Badge variant="secondary">Inactive</Badge>;
+      case "draft":
+        return <Badge variant="outline">Draft</Badge>;
+      case "filled":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+            Filled
+          </Badge>
+        );
+      case "closed":
+        return <Badge variant="destructive">Closed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Format salary for display
+  const formatSalary = (salary: ISalary) => {
+    if (!salary) return "Negotiable";
+
+    const currencySymbols: Record<string, string> = {
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      CAD: "C$",
+      AUD: "A$",
+      INR: "₹",
+    };
+
+    const symbol = currencySymbols[salary.currency] || salary.currency;
+
+    if (salary.min === salary.max) {
+      return `${symbol}${salary.min.toLocaleString()}/${salary.period}`;
+    }
+
+    return `${symbol}${salary.min.toLocaleString()} - ${symbol}${salary.max.toLocaleString()}/${
+      salary.period
+    }`;
+  };
+
+  // Get unique categories for filter
+  const categories = [
+    ...new Set(userJobs?.map((job) => job.category).filter(Boolean) || []),
+  ];
 
   // Don't render until component is mounted to avoid hydration issues
   if (!isMounted) {
@@ -192,37 +320,152 @@ export default function UserJobsPage() {
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Filters:</span>
-              </div>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger className="w-full md:w-40 shadow-sm">
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="new york">New York</SelectItem>
-                  <SelectItem value="san francisco">San Francisco</SelectItem>
-                  <SelectItem value="london">London</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full md:w-40 shadow-sm">
-                  <SelectValue placeholder="Job Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="full-time">Full Time</SelectItem>
-                  <SelectItem value="part-time">Part Time</SelectItem>
-                  <SelectItem value="contract">Contract</SelectItem>
-                  <SelectItem value="internship">Internship</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="flex items-center gap-2 shadow-sm"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {showAdvancedFilters ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
           </div>
+
+          {showAdvancedFilters && (
+            <Card className="mb-6 border border-gray-200 dark:border-gray-700">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Location
+                    </label>
+                    <Select
+                      value={locationFilter}
+                      onValueChange={setLocationFilter}
+                    >
+                      <SelectTrigger className="shadow-sm">
+                        <SelectValue placeholder="All Locations" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Locations</SelectItem>
+                        <SelectItem value="remote">Remote Only</SelectItem>
+                        <SelectItem value="new york">New York</SelectItem>
+                        <SelectItem value="san francisco">
+                          San Francisco
+                        </SelectItem>
+                        <SelectItem value="london">London</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Job Type
+                    </label>
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="shadow-sm">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="full-time">Full Time</SelectItem>
+                        <SelectItem value="part-time">Part Time</SelectItem>
+                        <SelectItem value="contract">Contract</SelectItem>
+                        <SelectItem value="internship">Internship</SelectItem>
+                        <SelectItem value="freelance">Freelance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Experience
+                    </label>
+                    <Select
+                      value={experienceFilter}
+                      onValueChange={setExperienceFilter}
+                    >
+                      <SelectTrigger className="shadow-sm">
+                        <SelectValue placeholder="All Levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Levels</SelectItem>
+                        <SelectItem value="entry">Entry Level</SelectItem>
+                        <SelectItem value="mid">Mid Level</SelectItem>
+                        <SelectItem value="senior">Senior Level</SelectItem>
+                        <SelectItem value="executive">Executive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Category
+                    </label>
+                    <Select
+                      value={categoryFilter}
+                      onValueChange={setCategoryFilter}
+                    >
+                      <SelectTrigger className="shadow-sm">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Min Salary
+                    </label>
+                    <Input
+                      placeholder="e.g. 50000"
+                      type="number"
+                      className="shadow-sm"
+                      value={salaryMinFilter}
+                      onChange={(e) => setSalaryMinFilter(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Max Salary
+                    </label>
+                    <Input
+                      placeholder="e.g. 100000"
+                      type="number"
+                      className="shadow-sm"
+                      value={salaryMaxFilter}
+                      onChange={(e) => setSalaryMaxFilter(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setLocationFilter("all");
+                      setTypeFilter("all");
+                      setExperienceFilter("all");
+                      setCategoryFilter("all");
+                      setSalaryMinFilter("");
+                      setSalaryMaxFilter("");
+                    }}
+                    className="shadow-sm"
+                  >
+                    Clear All Filters
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {isLoading ? (
             <div className="space-y-4">
@@ -286,20 +529,51 @@ export default function UserJobsPage() {
                           className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
                         >
                           <TableCell className="font-medium">
-                            <div className="font-semibold">{job.title}</div>
+                            <div className="flex flex-col">
+                              <div className="font-semibold flex items-center gap-2">
+                                {job.title}
+                                {job.featured && (
+                                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
+                                    <Star className="h-3 w-3 mr-1" />
+                                    Featured
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {getStatusBadge(job.status)}
+                                {job.isRemote && (
+                                  <Badge variant="outline">Remote</Badge>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
-                          <TableCell>{job.company}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {job.companyLogo ? (
+                                <Image
+                                  src={job.companyLogo}
+                                  alt={`${job.company} logo`}
+                                  className="w-6 h-6 rounded"
+                                  width={24}
+                                  height={24}
+                                />
+                              ) : (
+                                <Building className="h-5 w-5 text-gray-400" />
+                              )}
+                              <span>{job.company}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>{job.location}</TableCell>
                           <TableCell>
                             <Badge
-                              variant="outline"
+                              variant={getTypeBadgeVariant(job.type)}
                               className={getTypeBadgeColor(job.type)}
                             >
                               {job.type}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">
-                            {job.salary}
+                            {formatSalary(job.salary)}
                           </TableCell>
                           <TableCell className="text-gray-500 dark:text-gray-400">
                             {format(new Date(job.createdAt), "MMM d, yyyy")}
@@ -324,16 +598,27 @@ export default function UserJobsPage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleSaveJob(job.id)}
-                                className="shadow-sm"
+                                className={`shadow-sm ${
+                                  savedJobs.includes(job.id)
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : ""
+                                }`}
                               >
-                                <Bookmark className="h-4 w-4" />
+                                <Bookmark
+                                  className={`h-4 w-4 ${
+                                    savedJobs.includes(job.id)
+                                      ? "fill-current"
+                                      : ""
+                                  }`}
+                                />
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleApplyJob(job.id)}
-                                className="shadow-sm"
-                              >
-                                Apply
+                              <Button size="sm" asChild className="shadow-sm">
+                                <Link
+                                  href={`/dashboard/user/jobs/${job.id}`}
+                                  className="flex items-center gap-1"
+                                >
+                                  Apply
+                                </Link>
                               </Button>
                             </div>
                           </TableCell>
@@ -360,6 +645,10 @@ export default function UserJobsPage() {
                                   setSearchTerm("");
                                   setLocationFilter("all");
                                   setTypeFilter("all");
+                                  setExperienceFilter("all");
+                                  setCategoryFilter("all");
+                                  setSalaryMinFilter("");
+                                  setSalaryMaxFilter("");
                                 }}
                                 className="shadow-sm"
                               >
@@ -378,7 +667,6 @@ export default function UserJobsPage() {
                   </TableBody>
                 </Table>
               </div>
-
               {totalPages > 1 && (
                 <Pagination
                   totalPages={totalPages}

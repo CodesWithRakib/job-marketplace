@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchAdminAnalytics } from "@/redux/slices/job-slice";
+import { fetchAdminAnalytics } from "@/redux/slices/jobSlice";
 import {
   Card,
   CardContent,

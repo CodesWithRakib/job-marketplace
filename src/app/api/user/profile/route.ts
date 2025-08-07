@@ -1,6 +1,6 @@
 // app/api/user/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 import User from "@/schemas/User";
 import { getToken } from "next-auth/jwt";
 import { writeFile } from "fs/promises";

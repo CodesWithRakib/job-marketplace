@@ -7,7 +7,7 @@ import {
   fetchRecruiterJobs,
   createJob,
   deleteJob,
-} from "@/redux/slices/job-slice";
+} from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,

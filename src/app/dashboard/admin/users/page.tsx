@@ -8,7 +8,7 @@ import {
   createUser,
   updateUserStatus,
   deleteUser,
-} from "@/redux/slices/job-slice";
+} from "@/redux/slices/jobSlice";
 import {
   Table,
   TableBody,

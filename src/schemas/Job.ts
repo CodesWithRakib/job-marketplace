@@ -1,4 +1,3 @@
-// schemas/Job.ts
 import { Schema, model, models, Document, ObjectId } from "mongoose";
 
 // Salary sub-document interface
@@ -50,8 +49,6 @@ export interface IJob extends Document {
   promotedUntil?: Date;
   createdAt: Date;
   updatedAt: Date;
-  __v?: number;
-
   // Virtual properties
   formattedSalary?: string;
   daysUntilDeadline?: number;
@@ -230,7 +227,6 @@ JobSchema.virtual("formattedSalary").get(function () {
     INR: "₹",
   };
   const symbol = currencySymbols[currency] || currency;
-
   if (min === max) {
     return `${symbol}${min.toLocaleString()}/${period}`;
   }
@@ -255,5 +251,6 @@ JobSchema.index({ category: 1, industry: 1 });
 if (models.Job) {
   delete models.Job;
 }
+
 const Job = model<IJob>("Job", JobSchema);
 export default Job;

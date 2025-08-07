@@ -1,3 +1,4 @@
+// lib/api.ts
 import axios from "axios";
 import { getSession } from "next-auth/react";
 
@@ -30,13 +31,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error("API Error:", error);
-
     if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
       console.error("Error response data:", error.response.data);
       console.error("Error response status:", error.response.status);
-
       if (error.response.status === 401) {
         // Only redirect on client side
         if (typeof window !== "undefined") {
@@ -44,13 +41,10 @@ api.interceptors.response.use(
         }
       }
     } else if (error.request) {
-      // The request was made but no response was received
       console.error("No response received:", error.request);
     } else {
-      // Something happened in setting up the request that triggered an Error
       console.error("Error setting up request:", error.message);
     }
-
     return Promise.reject(error);
   }
 );

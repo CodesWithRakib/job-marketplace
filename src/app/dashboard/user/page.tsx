@@ -1,13 +1,13 @@
 // app/dashboard/user/page.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
 import {
   fetchUserJobs,
   fetchUserApplications,
   fetchSavedJobs,
-} from "@/redux/slices/job-slice";
+} from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Card,
