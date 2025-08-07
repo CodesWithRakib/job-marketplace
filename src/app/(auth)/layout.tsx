@@ -1,18 +1,17 @@
+// app/(auth)/layout.tsx
 "use client";
+
 import { ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Toaster } from "sonner";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-interface AuthLayoutProps {
-  children: ReactNode;
-  formType: "login" | "register";
-}
-
-export default function AuthLayout({ children, formType }: AuthLayoutProps) {
+export default function AuthLayout({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "";
+  const formType = pathname.includes("login") ? "login" : "register";
   const role = searchParams.get("role");
 
   return (

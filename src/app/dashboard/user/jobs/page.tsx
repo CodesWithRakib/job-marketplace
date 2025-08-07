@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchUserJobs, saveJob, unsaveJob } from "@/redux/slices/jobSlice";
+import { fetchUserJobs } from "@/redux/slices/jobSlice";
+import { saveJob, unsaveJob } from "@/redux/slices/applicationSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
