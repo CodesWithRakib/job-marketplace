@@ -67,6 +67,7 @@ import {
   AlertCircle,
   FileText,
   DollarSign,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,36 +84,75 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Pagination } from "@/components/common/pagination";
 
+// Define salary interface based on schema
+interface ISalary {
+  min: number;
+  max: number;
+  currency: "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "INR";
+  period: "hourly" | "monthly" | "yearly";
+}
+
 export default function RecruiterJobsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { recruiterJobs, isLoading } = useSelector(
-    (state: RootState) => state.jobs
-  );
   const { data: session } = useSession();
+
+  // Updated to match the store structure
+  const {
+    entities: jobEntities,
+    views: jobViews,
+    ui: jobUI,
+  } = useSelector((state: RootState) => state.jobs);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newJob, setNewJob] = useState({
-    title: "",
-    company: "",
-    description: "",
-    location: "",
-    type: "full-time",
-    salary: "",
-    status: "active",
-  });
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "ascending" | "descending";
   } | null>(null);
   const itemsPerPage = 10;
 
+  // Initialize new job form with schema structure
+  const [newJob, setNewJob] = useState({
+    title: "",
+    company: "",
+    description: "",
+    responsibilities: [""],
+    requirements: [""],
+    location: "",
+    isRemote: false,
+    type: "full-time",
+    experience: "mid",
+    salary: {
+      min: 0,
+      max: 0,
+      currency: "USD",
+      period: "yearly",
+    } as ISalary,
+    benefits: [""],
+    applicationDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    applicationMethod: "platform",
+    applicationEmail: "",
+    applicationUrl: "",
+    status: "active",
+    category: "Engineering",
+    industry: "",
+    tags: [""],
+    featured: false,
+  });
+
   useEffect(() => {
     if (session?.user?.id) {
       dispatch(fetchRecruiterJobs(session.user.id));
     }
   }, [dispatch, session]);
+
+  // Get recruiter jobs from entities using views.recruiter
+  const recruiterJobs = jobViews.recruiter.map((id) => jobEntities[id]);
 
   // Sorting function
   const requestSort = (key: string) => {
@@ -130,7 +170,6 @@ export default function RecruiterJobsPage() {
   // Apply sorting to jobs
   const getSortedJobs = (jobs: any[]) => {
     if (!sortConfig) return jobs;
-
     return [...jobs].sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) {
         return sortConfig.direction === "ascending" ? -1 : 1;
@@ -161,19 +200,53 @@ export default function RecruiterJobsPage() {
 
   const handleCreateJob = () => {
     if (session?.user?.id) {
-      dispatch(createJob({ ...newJob, recruiterId: session.user.id }))
+      // Format responsibilities and requirements as arrays
+      const formattedJob = {
+        ...newJob,
+        responsibilities: newJob.responsibilities.filter(
+          (r) => r.trim() !== ""
+        ),
+        requirements: newJob.requirements.filter((r) => r.trim() !== ""),
+        benefits: newJob.benefits.filter((b) => b.trim() !== ""),
+        tags: newJob.tags.filter((t) => t.trim() !== ""),
+        recruiterId: session.user.id,
+        applicationDeadline: new Date(newJob.applicationDeadline),
+      };
+
+      dispatch(createJob(formattedJob))
         .unwrap()
         .then(() => {
           toast.success("Job created successfully!");
           setIsCreateDialogOpen(false);
+          // Reset form
           setNewJob({
             title: "",
             company: "",
             description: "",
+            responsibilities: [""],
+            requirements: [""],
             location: "",
+            isRemote: false,
             type: "full-time",
-            salary: "",
+            experience: "mid",
+            salary: {
+              min: 0,
+              max: 0,
+              currency: "USD",
+              period: "yearly",
+            } as ISalary,
+            benefits: [""],
+            applicationDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split("T")[0],
+            applicationMethod: "platform",
+            applicationEmail: "",
+            applicationUrl: "",
             status: "active",
+            category: "Engineering",
+            industry: "",
+            tags: [""],
+            featured: false,
           });
         })
         .catch((error) => {
@@ -184,6 +257,7 @@ export default function RecruiterJobsPage() {
 
   const handleDeleteJob = (jobId: string) => {
     if (confirm("Are you sure you want to delete this job?")) {
+      setIsDeleting(jobId);
       dispatch(deleteJob(jobId))
         .unwrap()
         .then(() => {
@@ -191,8 +265,119 @@ export default function RecruiterJobsPage() {
         })
         .catch((error) => {
           toast.error(error.message || "Failed to delete job");
+        })
+        .finally(() => {
+          setIsDeleting(null);
         });
     }
+  };
+
+  const handleAddResponsibility = () => {
+    setNewJob({
+      ...newJob,
+      responsibilities: [...newJob.responsibilities, ""],
+    });
+  };
+
+  const handleRemoveResponsibility = (index: number) => {
+    if (newJob.responsibilities.length > 1) {
+      const updated = [...newJob.responsibilities];
+      updated.splice(index, 1);
+      setNewJob({
+        ...newJob,
+        responsibilities: updated,
+      });
+    }
+  };
+
+  const handleResponsibilityChange = (index: number, value: string) => {
+    const updated = [...newJob.responsibilities];
+    updated[index] = value;
+    setNewJob({
+      ...newJob,
+      responsibilities: updated,
+    });
+  };
+
+  const handleAddRequirement = () => {
+    setNewJob({
+      ...newJob,
+      requirements: [...newJob.requirements, ""],
+    });
+  };
+
+  const handleRemoveRequirement = (index: number) => {
+    if (newJob.requirements.length > 1) {
+      const updated = [...newJob.requirements];
+      updated.splice(index, 1);
+      setNewJob({
+        ...newJob,
+        requirements: updated,
+      });
+    }
+  };
+
+  const handleRequirementChange = (index: number, value: string) => {
+    const updated = [...newJob.requirements];
+    updated[index] = value;
+    setNewJob({
+      ...newJob,
+      requirements: updated,
+    });
+  };
+
+  const handleAddBenefit = () => {
+    setNewJob({
+      ...newJob,
+      benefits: [...newJob.benefits, ""],
+    });
+  };
+
+  const handleRemoveBenefit = (index: number) => {
+    if (newJob.benefits.length > 1) {
+      const updated = [...newJob.benefits];
+      updated.splice(index, 1);
+      setNewJob({
+        ...newJob,
+        benefits: updated,
+      });
+    }
+  };
+
+  const handleBenefitChange = (index: number, value: string) => {
+    const updated = [...newJob.benefits];
+    updated[index] = value;
+    setNewJob({
+      ...newJob,
+      benefits: updated,
+    });
+  };
+
+  const handleAddTag = () => {
+    setNewJob({
+      ...newJob,
+      tags: [...newJob.tags, ""],
+    });
+  };
+
+  const handleRemoveTag = (index: number) => {
+    if (newJob.tags.length > 1) {
+      const updated = [...newJob.tags];
+      updated.splice(index, 1);
+      setNewJob({
+        ...newJob,
+        tags: updated,
+      });
+    }
+  };
+
+  const handleTagChange = (index: number, value: string) => {
+    const updated = [...newJob.tags];
+    updated[index] = value;
+    setNewJob({
+      ...newJob,
+      tags: updated,
+    });
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -278,7 +463,7 @@ export default function RecruiterJobsPage() {
               Add Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[525px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <DialogContent className="sm:max-w-[525px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-gray-900 dark:text-white">
                 Create New Job
@@ -357,25 +542,264 @@ export default function RecruiterJobsPage() {
                     <SelectItem value="part-time">Part Time</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="internship">Internship</SelectItem>
+                    <SelectItem value="freelance">Freelance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label
-                  htmlFor="salary"
+                  htmlFor="experience"
                   className="text-right text-gray-700 dark:text-gray-300"
                 >
-                  Salary
+                  Experience
+                </Label>
+                <Select
+                  value={newJob.experience}
+                  onValueChange={(value) =>
+                    setNewJob({ ...newJob, experience: value })
+                  }
+                >
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <SelectValue placeholder="Select experience level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entry">Entry Level</SelectItem>
+                    <SelectItem value="mid">Mid Level</SelectItem>
+                    <SelectItem value="senior">Senior Level</SelectItem>
+                    <SelectItem value="executive">Executive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="category"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Category
+                </Label>
+                <Select
+                  value={newJob.category}
+                  onValueChange={(value) =>
+                    setNewJob({ ...newJob, category: value })
+                  }
+                >
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Engineering">Engineering</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Customer Service">
+                      Customer Service
+                    </SelectItem>
+                    <SelectItem value="Operations">Operations</SelectItem>
+                    <SelectItem value="Finance">Finance</SelectItem>
+                    <SelectItem value="HR">HR</SelectItem>
+                    <SelectItem value="Data">Data</SelectItem>
+                    <SelectItem value="Product">Product</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="industry"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Industry
                 </Label>
                 <Input
-                  id="salary"
-                  value={newJob.salary}
+                  id="industry"
+                  value={newJob.industry}
                   onChange={(e) =>
-                    setNewJob({ ...newJob, salary: e.target.value })
+                    setNewJob({ ...newJob, industry: e.target.value })
                   }
                   className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="currency"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Currency
+                </Label>
+                <Select
+                  value={newJob.salary.currency}
+                  onValueChange={(value) =>
+                    setNewJob({
+                      ...newJob,
+                      salary: { ...newJob.salary, currency: value as any },
+                    })
+                  }
+                >
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                    <SelectItem value="CAD">CAD</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="INR">INR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="minSalary"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Min Salary
+                </Label>
+                <Input
+                  id="minSalary"
+                  type="number"
+                  value={newJob.salary.min}
+                  onChange={(e) =>
+                    setNewJob({
+                      ...newJob,
+                      salary: {
+                        ...newJob.salary,
+                        min: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="maxSalary"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Max Salary
+                </Label>
+                <Input
+                  id="maxSalary"
+                  type="number"
+                  value={newJob.salary.max}
+                  onChange={(e) =>
+                    setNewJob({
+                      ...newJob,
+                      salary: {
+                        ...newJob.salary,
+                        max: parseInt(e.target.value) || 0,
+                      },
+                    })
+                  }
+                  className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="period"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Period
+                </Label>
+                <Select
+                  value={newJob.salary.period}
+                  onValueChange={(value) =>
+                    setNewJob({
+                      ...newJob,
+                      salary: { ...newJob.salary, period: value as any },
+                    })
+                  }
+                >
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="applicationDeadline"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Application Deadline
+                </Label>
+                <Input
+                  id="applicationDeadline"
+                  type="date"
+                  value={newJob.applicationDeadline}
+                  onChange={(e) =>
+                    setNewJob({
+                      ...newJob,
+                      applicationDeadline: e.target.value,
+                    })
+                  }
+                  className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="applicationMethod"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Application Method
+                </Label>
+                <Select
+                  value={newJob.applicationMethod}
+                  onValueChange={(value) =>
+                    setNewJob({ ...newJob, applicationMethod: value as any })
+                  }
+                >
+                  <SelectTrigger className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+                    <SelectValue placeholder="Select application method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="platform">Platform</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="external">External</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {newJob.applicationMethod === "email" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label
+                    htmlFor="applicationEmail"
+                    className="text-right text-gray-700 dark:text-gray-300"
+                  >
+                    Application Email
+                  </Label>
+                  <Input
+                    id="applicationEmail"
+                    type="email"
+                    value={newJob.applicationEmail}
+                    onChange={(e) =>
+                      setNewJob({ ...newJob, applicationEmail: e.target.value })
+                    }
+                    className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+              )}
+              {newJob.applicationMethod === "external" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label
+                    htmlFor="applicationUrl"
+                    className="text-right text-gray-700 dark:text-gray-300"
+                  >
+                    Application URL
+                  </Label>
+                  <Input
+                    id="applicationUrl"
+                    value={newJob.applicationUrl}
+                    onChange={(e) =>
+                      setNewJob({ ...newJob, applicationUrl: e.target.value })
+                    }
+                    className="col-span-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label
                   htmlFor="status"
@@ -401,6 +825,46 @@ export default function RecruiterJobsPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label
+                  htmlFor="featured"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Featured
+                </Label>
+                <div className="col-span-3 flex items-center">
+                  <input
+                    type="checkbox"
+                    id="featured"
+                    checked={newJob.featured}
+                    onChange={(e) =>
+                      setNewJob({ ...newJob, featured: e.target.checked })
+                    }
+                    className="mr-2"
+                  />
+                  <label htmlFor="featured">Feature this job posting</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
+                  htmlFor="isRemote"
+                  className="text-right text-gray-700 dark:text-gray-300"
+                >
+                  Remote
+                </Label>
+                <div className="col-span-3 flex items-center">
+                  <input
+                    type="checkbox"
+                    id="isRemote"
+                    checked={newJob.isRemote}
+                    onChange={(e) =>
+                      setNewJob({ ...newJob, isRemote: e.target.checked })
+                    }
+                    className="mr-2"
+                  />
+                  <label htmlFor="isRemote">This is a remote position</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label
                   htmlFor="description"
                   className="text-right text-gray-700 dark:text-gray-300"
                 >
@@ -416,6 +880,172 @@ export default function RecruiterJobsPage() {
                   rows={3}
                 />
               </div>
+
+              {/* Responsibilities */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right text-gray-700 dark:text-gray-300 pt-2">
+                  Responsibilities
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  {newJob.responsibilities.map((resp, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={resp}
+                        onChange={(e) =>
+                          handleResponsibilityChange(index, e.target.value)
+                        }
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                        placeholder="Responsibility"
+                      />
+                      {newJob.responsibilities.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveResponsibility(index)}
+                          className="p-1 h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddResponsibility}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Responsibility
+                  </Button>
+                </div>
+              </div>
+
+              {/* Requirements */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right text-gray-700 dark:text-gray-300 pt-2">
+                  Requirements
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  {newJob.requirements.map((req, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={req}
+                        onChange={(e) =>
+                          handleRequirementChange(index, e.target.value)
+                        }
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                        placeholder="Requirement"
+                      />
+                      {newJob.requirements.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveRequirement(index)}
+                          className="p-1 h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddRequirement}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Requirement
+                  </Button>
+                </div>
+              </div>
+
+              {/* Benefits */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right text-gray-700 dark:text-gray-300 pt-2">
+                  Benefits
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  {newJob.benefits.map((benefit, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={benefit}
+                        onChange={(e) =>
+                          handleBenefitChange(index, e.target.value)
+                        }
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                        placeholder="Benefit"
+                      />
+                      {newJob.benefits.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveBenefit(index)}
+                          className="p-1 h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddBenefit}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Benefit
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right text-gray-700 dark:text-gray-300 pt-2">
+                  Tags
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  {newJob.tags.map((tag, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={tag}
+                        onChange={(e) => handleTagChange(index, e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                        placeholder="Tag"
+                      />
+                      {newJob.tags.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveTag(index)}
+                          className="p-1 h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddTag}
+                    className="mt-1"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Tag
+                  </Button>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -429,7 +1059,6 @@ export default function RecruiterJobsPage() {
           </DialogContent>
         </Dialog>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
@@ -450,7 +1079,6 @@ export default function RecruiterJobsPage() {
             </p>
           </CardContent>
         </Card>
-
         <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -470,7 +1098,6 @@ export default function RecruiterJobsPage() {
             </p>
           </CardContent>
         </Card>
-
         <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -493,7 +1120,6 @@ export default function RecruiterJobsPage() {
           </CardContent>
         </Card>
       </div>
-
       <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
@@ -533,8 +1159,7 @@ export default function RecruiterJobsPage() {
               </Select>
             </div>
           </div>
-
-          {isLoading ? (
+          {jobUI.isLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div
@@ -624,6 +1249,11 @@ export default function RecruiterJobsPage() {
                             <div className="flex items-center gap-2">
                               <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                               {job.location}
+                              {job.isRemote && (
+                                <Badge variant="outline" className="ml-1">
+                                  Remote
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -688,8 +1318,13 @@ export default function RecruiterJobsPage() {
                                 <DropdownMenuItem
                                   className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
                                   onClick={() => handleDeleteJob(job.id)}
+                                  disabled={isDeleting === job.id}
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {isDeleting === job.id ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                  )}
                                   Delete Job
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchRecruiterAnalytics } from "@/redux/slices/jobSlice";
+import { fetchRecruiterAnalytics } from "@/redux/slices/analyticsSlice";
 import { useSession } from "next-auth/react";
 import {
   Card,
@@ -21,6 +21,8 @@ import {
   TrendingDown,
   Calendar,
   Download,
+  Users,
+  Eye,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -44,7 +46,7 @@ import { toast } from "sonner";
 export default function RecruiterDashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { recruiterAnalytics, isLoading } = useSelector(
-    (state: RootState) => state.jobs
+    (state: RootState) => state.analytics
   );
   const { data: session } = useSession();
   const [timeRange, setTimeRange] = useState("30");
@@ -112,14 +114,14 @@ export default function RecruiterDashboardPage() {
 
   const applicationStatusDistributionData =
     recruiterAnalytics.applicationStatusDistribution.map((item: any) => ({
-      name: item._id,
+      name: item._id.charAt(0).toUpperCase() + item._id.slice(1),
       value: item.count,
     }));
 
   const COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b"];
 
   return (
-    <div className="min-h-screen  ">
+    <div className="min-h-screen">
       <div className="w-full">
         {/* Header */}
         <div className="mb-8">
@@ -469,8 +471,23 @@ export default function RecruiterDashboardPage() {
                               </p>
                             </div>
                           </div>
-                          <div className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-md">
-                            {job.viewCount || 0} views
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-md flex items-center">
+                              <Eye className="h-3 w-3 mr-1" />
+                              {job.views || 0} views
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={
+                                job.status === "active"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                  : job.status === "inactive"
+                                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                              }
+                            >
+                              {job.status}
+                            </Badge>
                           </div>
                         </div>
                       )
@@ -549,7 +566,6 @@ export default function RecruiterDashboardPage() {
                         {recruiterAnalytics.jobs.active} active jobs
                       </p>
                     </div>
-
                     <div className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-800/30 p-4 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                       <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">
                         New Jobs
@@ -564,7 +580,6 @@ export default function RecruiterDashboardPage() {
                         Posted in the last {timeRange} days
                       </p>
                     </div>
-
                     <div className="bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-800/30 p-4 rounded-lg border border-teal-100 dark:border-teal-900/50">
                       <h3 className="text-lg font-semibold text-teal-800 dark:text-teal-200">
                         Job Growth Rate
@@ -711,21 +726,19 @@ export default function RecruiterDashboardPage() {
                       {timeRange} days
                     </p>
                   </div>
-
                   <div className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-800/30 p-4 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                     <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">
                       Accepted Applications
                     </h3>
                     <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-200">
                       {applicationStatusDistributionData.find(
-                        (s: any) => s._id === "accepted"
+                        (s: any) => s.name === "Accepted"
                       )?.value || 0}
                     </p>
                     <p className="text-sm text-emerald-600 dark:text-emerald-300">
                       Successfully hired candidates
                     </p>
                   </div>
-
                   <div className="bg-gradient-to-br from-teal-50 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-800/30 p-4 rounded-lg border border-teal-100 dark:border-teal-900/50">
                     <h3 className="text-lg font-semibold text-teal-800 dark:text-teal-200">
                       Application Rate

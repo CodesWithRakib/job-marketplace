@@ -1,7 +1,7 @@
 // app/dashboard/recruiter/post-job/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -48,7 +48,14 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { IJob } from "@/schemas/Job";
+
+// Define salary interface based on schema
+interface ISalary {
+  min: number;
+  max: number;
+  currency: "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "INR";
+  period: "hourly" | "monthly" | "yearly";
+}
 
 const jobSchema = z.object({
   title: z.string().min(1, "Job title is required"),
@@ -57,10 +64,10 @@ const jobSchema = z.object({
   companyWebsite: z.string().optional(),
   description: z.string().min(10, "Description must be at least 10 characters"),
   responsibilities: z
-    .array(z.string())
+    .array(z.string().min(1, "Responsibility cannot be empty"))
     .min(1, "At least one responsibility is required"),
   requirements: z
-    .array(z.string())
+    .array(z.string().min(1, "Requirement cannot be empty"))
     .min(1, "At least one requirement is required"),
   location: z.string().min(1, "Location is required"),
   isRemote: z.boolean().default(false),
@@ -78,10 +85,10 @@ const jobSchema = z.object({
     currency: z.enum(["USD", "EUR", "GBP", "CAD", "AUD", "INR"]).default("USD"),
     period: z.enum(["hourly", "monthly", "yearly"]).default("yearly"),
   }),
-  benefits: z.array(z.string()).optional(),
+  benefits: z.array(z.string().min(1, "Benefit cannot be empty")).optional(),
   applicationDeadline: z.string().min(1, "Application deadline is required"),
   applicationMethod: z
-    .enum(["email", "external", "platform"])
+    .enum(["platform", "email", "external"]) // Changed from "url" to "external"
     .default("platform"),
   applicationEmail: z.string().optional(),
   applicationUrl: z.string().optional(),
@@ -102,7 +109,7 @@ const jobSchema = z.object({
     "Other",
   ]),
   industry: z.string().min(1, "Industry is required"),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string().min(1, "Tag cannot be empty")).optional(),
   featured: z.boolean().default(false),
   promotedUntil: z.string().optional(),
 });
@@ -111,15 +118,6 @@ type JobFormData = z.infer<typeof jobSchema>;
 
 export default function PostJobPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [benefitInput, setBenefitInput] = useState("");
-  const [benefits, setBenefits] = useState<string[]>([]);
-  const [responsibilityInput, setResponsibilityInput] = useState("");
-  const [responsibilities, setResponsibilities] = useState<string[]>([]);
-  const [requirementInput, setRequirementInput] = useState("");
-  const [requirements, setRequirements] = useState<string[]>([]);
-
   const router = useRouter();
   const { data: session, status } = useSession();
   const dispatch = useDispatch<AppDispatch>();
@@ -148,40 +146,58 @@ export default function PostJobPage() {
       salary: {
         currency: "USD",
         period: "yearly",
+        min: 0,
+        max: 0,
       },
       benefits: [],
-      responsibilities: [],
-      requirements: [],
-      tags: [],
+      responsibilities: [""],
+      requirements: [""],
+      tags: [""],
     },
+  });
+
+  // Use useFieldArray for managing dynamic arrays
+  const {
+    fields: responsibilityFields,
+    append: appendResponsibility,
+    remove: removeResponsibility,
+  } = useFieldArray({
+    control,
+    name: "responsibilities",
+  });
+
+  const {
+    fields: requirementFields,
+    append: appendRequirement,
+    remove: removeRequirement,
+  } = useFieldArray({
+    control,
+    name: "requirements",
+  });
+
+  const {
+    fields: benefitFields,
+    append: appendBenefit,
+    remove: removeBenefit,
+  } = useFieldArray({
+    control,
+    name: "benefits",
+  });
+
+  const {
+    fields: tagFields,
+    append: appendTag,
+    remove: removeTag,
+  } = useFieldArray({
+    control,
+    name: "tags",
   });
 
   const watchedType = watch("type");
   const watchedStatus = watch("status");
   const watchedIsRemote = watch("isRemote");
   const watchedApplicationMethod = watch("applicationMethod");
-
-  // Helper functions for managing arrays
-  const addArrayItem = (
-    value: string,
-    array: string[],
-    setArray: React.Dispatch<React.SetStateAction<string[]>>,
-    inputSetter: React.Dispatch<React.SetStateAction<string>>
-  ) => {
-    if (value.trim() && !array.includes(value.trim())) {
-      setArray([...array, value.trim()]);
-      inputSetter("");
-    }
-  };
-
-  const removeArrayItem = (
-    itemToRemove: string,
-    array: string[],
-    setArray: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    const updatedArray = array.filter((item) => item !== itemToRemove);
-    setArray(updatedArray);
-  };
+  const watchedSalaryCurrency = watch("salary.currency");
 
   const handleKeyPress = (e: React.KeyboardEvent, callback: () => void) => {
     if (e.key === "Enter") {
@@ -189,23 +205,6 @@ export default function PostJobPage() {
       callback();
     }
   };
-
-  // Update form when arrays change
-  useEffect(() => {
-    setValue("tags", tags);
-  }, [tags, setValue]);
-
-  useEffect(() => {
-    setValue("benefits", benefits);
-  }, [benefits, setValue]);
-
-  useEffect(() => {
-    setValue("responsibilities", responsibilities);
-  }, [responsibilities, setValue]);
-
-  useEffect(() => {
-    setValue("requirements", requirements);
-  }, [requirements, setValue]);
 
   const onSubmit = async (data: JobFormData) => {
     if (!session?.user?.id) {
@@ -215,9 +214,13 @@ export default function PostJobPage() {
 
     setIsSubmitting(true);
     try {
-      // Convert string date to Date object
-      const formattedData = {
+      // Filter out empty strings from arrays
+      const filteredData = {
         ...data,
+        responsibilities: data.responsibilities.filter((r) => r.trim() !== ""),
+        requirements: data.requirements.filter((r) => r.trim() !== ""),
+        benefits: data.benefits?.filter((b) => b.trim() !== "") || [],
+        tags: data.tags?.filter((t) => t.trim() !== "") || [],
         applicationDeadline: new Date(data.applicationDeadline),
         promotedUntil: data.promotedUntil
           ? new Date(data.promotedUntil)
@@ -226,7 +229,7 @@ export default function PostJobPage() {
 
       await dispatch(
         createJob({
-          ...formattedData,
+          ...filteredData,
           recruiterId: session.user.id,
         })
       ).unwrap();
@@ -253,6 +256,15 @@ export default function PostJobPage() {
     return null;
   }
 
+  const currencySymbols: Record<string, string> = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    CAD: "C$",
+    AUD: "A$",
+    INR: "₹",
+  };
+
   return (
     <div className="max-w-4xl mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 p-4 md:p-6 rounded-xl">
       <div className="mb-8">
@@ -271,7 +283,6 @@ export default function PostJobPage() {
           Fill in the details below to create a new job posting
         </p>
       </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         {/* Basic Information */}
         <Card className="shadow-sm border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
@@ -306,7 +317,6 @@ export default function PostJobPage() {
                   <p className="text-sm text-red-500">{errors.title.message}</p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="company"
@@ -329,7 +339,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="location"
@@ -352,7 +361,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="category"
@@ -389,7 +397,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="industry"
@@ -409,7 +416,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="companyWebsite"
@@ -428,7 +434,6 @@ export default function PostJobPage() {
                 </div>
               </div>
             </div>
-
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="isRemote"
@@ -480,204 +485,123 @@ export default function PostJobPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                  Responsibilities <span className="text-red-500">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={responsibilityInput}
-                    onChange={(e) => setResponsibilityInput(e.target.value)}
-                    onKeyPress={(e) =>
-                      handleKeyPress(e, () =>
-                        addArrayItem(
-                          responsibilityInput,
-                          responsibilities,
-                          setResponsibilities,
-                          setResponsibilityInput
-                        )
-                      )
-                    }
-                    placeholder="Add a responsibility"
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      addArrayItem(
-                        responsibilityInput,
-                        responsibilities,
-                        setResponsibilities,
-                        setResponsibilityInput
-                      )
-                    }
-                    disabled={!responsibilityInput.trim()}
-                    className="shadow-sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {responsibilities.map((responsibility, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      {responsibility}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeArrayItem(
-                            responsibility,
-                            responsibilities,
-                            setResponsibilities
-                          )
-                        }
-                        className="ml-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                {errors.responsibilities && (
-                  <p className="text-sm text-red-500">
-                    {errors.responsibilities.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                  Requirements <span className="text-red-500">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={requirementInput}
-                    onChange={(e) => setRequirementInput(e.target.value)}
-                    onKeyPress={(e) =>
-                      handleKeyPress(e, () =>
-                        addArrayItem(
-                          requirementInput,
-                          requirements,
-                          setRequirements,
-                          setRequirementInput
-                        )
-                      )
-                    }
-                    placeholder="Add a requirement"
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      addArrayItem(
-                        requirementInput,
-                        requirements,
-                        setRequirements,
-                        setRequirementInput
-                      )
-                    }
-                    disabled={!requirementInput.trim()}
-                    className="shadow-sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {requirements.map((requirement, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      {requirement}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          removeArrayItem(
-                            requirement,
-                            requirements,
-                            setRequirements
-                          )
-                        }
-                        className="ml-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                {errors.requirements && (
-                  <p className="text-sm text-red-500">
-                    {errors.requirements.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
+            {/* Responsibilities */}
             <div className="space-y-2">
               <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                Responsibilities <span className="text-red-500">*</span>
+              </Label>
+              {responsibilityFields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <Input
+                    {...register(`responsibilities.${index}`)}
+                    placeholder={`Responsibility ${index + 1}`}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                  {responsibilityFields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeResponsibility(index)}
+                      className="p-1 h-8 w-8"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendResponsibility("")}
+                className="mt-1"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Responsibility
+              </Button>
+              {errors.responsibilities && (
+                <p className="text-sm text-red-500">
+                  {errors.responsibilities.message}
+                </p>
+              )}
+            </div>
+
+            {/* Requirements */}
+            <div className="space-y-2">
+              <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                Requirements <span className="text-red-500">*</span>
+              </Label>
+              {requirementFields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <Input
+                    {...register(`requirements.${index}`)}
+                    placeholder={`Requirement ${index + 1}`}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                  {requirementFields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeRequirement(index)}
+                      className="p-1 h-8 w-8"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendRequirement("")}
+                className="mt-1"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Requirement
+              </Button>
+              {errors.requirements && (
+                <p className="text-sm text-red-500">
+                  {errors.requirements.message}
+                </p>
+              )}
+            </div>
+
+            {/* Benefits */}
+            <div className="space-y-2">
+              <Label className="text-gray-700 dark:text-gray-300">
                 Benefits
               </Label>
-              <div className="flex gap-2">
-                <Input
-                  value={benefitInput}
-                  onChange={(e) => setBenefitInput(e.target.value)}
-                  onKeyPress={(e) =>
-                    handleKeyPress(e, () =>
-                      addArrayItem(
-                        benefitInput,
-                        benefits,
-                        setBenefits,
-                        setBenefitInput
-                      )
-                    )
-                  }
-                  placeholder="Add a benefit (e.g. Health insurance, 401k)"
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    addArrayItem(
-                      benefitInput,
-                      benefits,
-                      setBenefits,
-                      setBenefitInput
-                    )
-                  }
-                  disabled={!benefitInput.trim()}
-                  className="shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {benefits.map((benefit, index) => (
-                  <Badge
-                    key={index}
-                    variant="secondary"
-                    className="flex items-center gap-1"
+              {benefitFields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <Input
+                    {...register(`benefits.${index}`)}
+                    placeholder={`Benefit ${index + 1}`}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeBenefit(index)}
+                    className="p-1 h-8 w-8"
                   >
-                    {benefit}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeArrayItem(benefit, benefits, setBenefits)
-                      }
-                      className="ml-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendBenefit("")}
+                className="mt-1"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Benefit
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -707,7 +631,6 @@ export default function PostJobPage() {
                   <p className="text-sm text-red-500">{errors.type.message}</p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="experience"
@@ -737,7 +660,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="applicationDeadline"
@@ -760,7 +682,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="status"
@@ -807,7 +728,9 @@ export default function PostJobPage() {
                   Minimum Salary <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <span className="absolute left-3 top-3 text-gray-400">
+                    {currencySymbols[watchedSalaryCurrency] || "$"}
+                  </span>
                   <Input
                     id="salary.min"
                     type="number"
@@ -822,7 +745,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="salary.max"
@@ -831,7 +753,9 @@ export default function PostJobPage() {
                   Maximum Salary <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <span className="absolute left-3 top-3 text-gray-400">
+                    {currencySymbols[watchedSalaryCurrency] || "$"}
+                  </span>
                   <Input
                     id="salary.max"
                     type="number"
@@ -846,7 +770,6 @@ export default function PostJobPage() {
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="salary.currency"
@@ -873,7 +796,6 @@ export default function PostJobPage() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="salary.period"
@@ -940,7 +862,6 @@ export default function PostJobPage() {
                 </SelectContent>
               </Select>
             </div>
-
             {watchedApplicationMethod === "email" && (
               <div className="space-y-2">
                 <Label
@@ -963,7 +884,6 @@ export default function PostJobPage() {
                 )}
               </div>
             )}
-
             {watchedApplicationMethod === "external" && (
               <div className="space-y-2">
                 <Label
@@ -1000,52 +920,37 @@ export default function PostJobPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Tags */}
             <div className="space-y-2">
-              <Label className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                Tags
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) =>
-                    handleKeyPress(e, () =>
-                      addArrayItem(tagInput, tags, setTags, setTagInput)
-                    )
-                  }
-                  placeholder="Add a tag (e.g. React, TypeScript)"
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    addArrayItem(tagInput, tags, setTags, setTagInput)
-                  }
-                  disabled={!tagInput.trim()}
-                  className="shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tags.map((tag, index) => (
-                  <Badge
-                    key={index}
-                    variant="secondary"
-                    className="flex items-center gap-1"
+              <Label className="text-gray-700 dark:text-gray-300">Tags</Label>
+              {tagFields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <Input
+                    {...register(`tags.${index}`)}
+                    placeholder={`Tag ${index + 1}`}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeTag(index)}
+                    className="p-1 h-8 w-8"
                   >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeArrayItem(tag, tags, setTags)}
-                      className="ml-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => appendTag("")}
+                className="mt-1"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Tag
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1063,7 +968,6 @@ export default function PostJobPage() {
                   Feature this job posting
                 </Label>
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="promotedUntil"
@@ -1083,7 +987,6 @@ export default function PostJobPage() {
         </Card>
 
         <Separator />
-
         <div className="flex justify-end space-x-4">
           <Button
             type="button"

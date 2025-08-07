@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/redux/store";
-import { fetchRecruiterApplications } from "@/redux/slices/jobSlice";
+import { fetchRecruiterApplications } from "@/redux/slices/applicationSlice";
+import { updateApplication } from "@/redux/slices/applicationSlice";
+import { fetchJobById } from "@/redux/slices/jobSlice";
 import { useSession } from "next-auth/react";
 import {
   Table,
@@ -56,6 +58,7 @@ import {
   CheckCircle,
   Hourglass,
   XCircle,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -74,14 +77,28 @@ import { Separator } from "@/components/ui/separator";
 
 export default function RecruiterApplicationsPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const { recruiterApplications, isLoading } = useSelector(
+  const { data: session } = useSession();
+
+  // Updated to get data from the applications slice
+  const {
+    entities: applicationEntities,
+    views: applicationViews,
+    ui: applicationUI,
+  } = useSelector((state: RootState) => state.applications);
+
+  // Get job entities from the job slice
+  const { entities: jobEntities } = useSelector(
     (state: RootState) => state.jobs
   );
-  const { data: session } = useSession();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [mounted, setMounted] = useState(false);
+  const [loadingJobIds, setLoadingJobIds] = useState<string[]>([]);
+  const [updatingApplicationId, setUpdatingApplicationId] = useState<
+    string | null
+  >(null);
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "ascending" | "descending";
@@ -97,6 +114,46 @@ export default function RecruiterApplicationsPage() {
       dispatch(fetchRecruiterApplications(session.user.id));
     }
   }, [dispatch, session, mounted]);
+
+  // Get recruiter applications from entities using views.recruiter
+  const recruiterApplications = applicationViews.recruiter.map(
+    (id) => applicationEntities[id]
+  );
+
+  // Fetch job details for applications if not already loaded
+  useEffect(() => {
+    const missingJobIds = recruiterApplications
+      .filter((application) => !jobEntities[application.jobId])
+      .map((application) => application.jobId);
+
+    // Only fetch jobs that aren't already being loaded
+    const jobsToFetch = missingJobIds.filter(
+      (jobId) => !loadingJobIds.includes(jobId)
+    );
+
+    if (jobsToFetch.length > 0) {
+      setLoadingJobIds((prev) => [...prev, ...jobsToFetch]);
+
+      jobsToFetch.forEach((jobId) => {
+        dispatch(fetchJobById(jobId))
+          .unwrap()
+          .finally(() => {
+            setLoadingJobIds((prev) => prev.filter((id) => id !== jobId));
+          });
+      });
+    }
+  }, [recruiterApplications, jobEntities, dispatch, loadingJobIds]);
+
+  // Combine applications with their job details
+  const applicationsWithDetails = recruiterApplications
+    .map((application) => {
+      const jobDetails = jobEntities[application.jobId];
+      return {
+        ...application,
+        jobDetails,
+      };
+    })
+    .filter((item) => item.jobDetails); // Only include items where we have job details
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -119,12 +176,19 @@ export default function RecruiterApplicationsPage() {
   // Apply sorting to applications
   const getSortedApplications = (applications: any[]) => {
     if (!sortConfig) return applications;
-
     return [...applications].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
+      // Handle nested properties
+      const aValue = sortConfig.key.includes(".")
+        ? sortConfig.key.split(".").reduce((obj, key) => obj?.[key], a)
+        : a[sortConfig.key];
+      const bValue = sortConfig.key.includes(".")
+        ? sortConfig.key.split(".").reduce((obj, key) => obj?.[key], b)
+        : b[sortConfig.key];
+
+      if (aValue < bValue) {
         return sortConfig.direction === "ascending" ? -1 : 1;
       }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
+      if (aValue > bValue) {
         return sortConfig.direction === "ascending" ? 1 : -1;
       }
       return 0;
@@ -132,21 +196,23 @@ export default function RecruiterApplicationsPage() {
   };
 
   // Filter applications based on search term and status
-  const filteredApplications = recruiterApplications?.filter((application) => {
-    const matchesSearch =
-      application.userId?.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      application.jobId?.title
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      application.jobId?.company
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || application.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredApplications = applicationsWithDetails?.filter(
+    (application) => {
+      const matchesSearch =
+        application.userId?.name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        application.jobDetails?.title
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        application.jobDetails?.company
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      const matchesStatus =
+        statusFilter === "all" || application.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    }
+  );
 
   // Apply sorting
   const sortedApplications = getSortedApplications(filteredApplications || []);
@@ -206,9 +272,24 @@ export default function RecruiterApplicationsPage() {
     }
   };
 
-  const handleUpdateStatus = (applicationId: string, newStatus: string) => {
-    console.log(`Updating application ${applicationId} to status ${newStatus}`);
-    toast.success(`Application status updated to ${newStatus}`);
+  const handleUpdateStatus = async (
+    applicationId: string,
+    newStatus: string
+  ) => {
+    setUpdatingApplicationId(applicationId);
+    try {
+      await dispatch(
+        updateApplication({
+          applicationId,
+          status: newStatus,
+        })
+      ).unwrap();
+      toast.success(`Application status updated to ${newStatus}`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update application status");
+    } finally {
+      setUpdatingApplicationId(null);
+    }
   };
 
   const handleExportApplications = () => {
@@ -260,7 +341,6 @@ export default function RecruiterApplicationsPage() {
             </Button>
           </div>
         </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-slate-800 dark:to-blue-900/20 border-blue-100 dark:border-blue-900/50 shadow-lg overflow-hidden">
@@ -286,7 +366,6 @@ export default function RecruiterApplicationsPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-br from-white to-green-50 dark:from-slate-800 dark:to-green-900/20 border-green-100 dark:border-green-900/50 shadow-lg overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -312,7 +391,6 @@ export default function RecruiterApplicationsPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-br from-white to-purple-50 dark:from-slate-800 dark:to-purple-900/20 border-purple-100 dark:border-purple-900/50 shadow-lg overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -339,7 +417,6 @@ export default function RecruiterApplicationsPage() {
             </CardContent>
           </Card>
         </div>
-
         <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
           <CardHeader>
             <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
@@ -382,8 +459,7 @@ export default function RecruiterApplicationsPage() {
                 </Select>
               </div>
             </div>
-
-            {isLoading ? (
+            {applicationUI.isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
                   <div
@@ -418,10 +494,10 @@ export default function RecruiterApplicationsPage() {
                         </TableHead>
                         <TableHead
                           className="text-slate-600 dark:text-slate-300 font-medium cursor-pointer"
-                          onClick={() => requestSort("jobId.title")}
+                          onClick={() => requestSort("jobDetails.title")}
                         >
                           <div className="flex items-center gap-1">
-                            Job {getSortIcon("jobId.title")}
+                            Job {getSortIcon("jobDetails.title")}
                           </div>
                         </TableHead>
                         <TableHead className="text-slate-600 dark:text-slate-300 font-medium">
@@ -450,132 +526,161 @@ export default function RecruiterApplicationsPage() {
                     </TableHeader>
                     <TableBody>
                       {currentApplications?.length ? (
-                        currentApplications.map((application) => (
-                          <TableRow
-                            key={application.id}
-                            className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                          >
-                            <TableCell className="font-medium text-slate-900 dark:text-white">
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10">
-                                  <AvatarImage
-                                    src={application.userId?.profileImage}
-                                    alt={application.userId?.name}
-                                  />
-                                  <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                                    {application.userId?.name?.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="font-medium">
-                                    {application.userId?.name}
-                                  </div>
-                                  <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                    <Mail className="h-3 w-3" />
-                                    {application.userId?.email}
+                        currentApplications.map((application) => {
+                          const job = application.jobDetails;
+                          return (
+                            <TableRow
+                              key={application.id}
+                              className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                            >
+                              <TableCell className="font-medium text-slate-900 dark:text-white">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarImage
+                                      src={application.userId?.profileImage}
+                                      alt={application.userId?.name}
+                                    />
+                                    <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                      {application.userId?.name?.charAt(0)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-medium">
+                                      {application.userId?.name}
+                                    </div>
+                                    <div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                      <Mail className="h-3 w-3" />
+                                      {application.userId?.email}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-slate-900 dark:text-white">
-                              <div className="flex items-center gap-2">
-                                <Briefcase className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                                {application.jobId?.title}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-slate-900 dark:text-white">
-                              <div className="flex items-center gap-2">
-                                <Building className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                                {application.jobId?.company}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={getStatusBadgeColor(
-                                  application.status
-                                )}
-                              >
-                                <span className="flex items-center gap-1">
-                                  {getStatusIcon(application.status)}
-                                  {application.status.charAt(0).toUpperCase() +
-                                    application.status.slice(1)}
-                                </span>
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-slate-900 dark:text-white">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                                {format(
-                                  new Date(application.createdAt),
-                                  "MMM d, yyyy"
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                                  >
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg"
+                              </TableCell>
+                              <TableCell className="text-slate-900 dark:text-white">
+                                <div className="flex items-center gap-2">
+                                  <Briefcase className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                  {job.title}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-900 dark:text-white">
+                                <div className="flex items-center gap-2">
+                                  <Building className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                  {job.company}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={getStatusBadgeColor(
+                                    application.status
+                                  )}
                                 >
-                                  <DropdownMenuLabel className="text-slate-900 dark:text-white">
-                                    Actions
-                                  </DropdownMenuLabel>
-                                  <DropdownMenuItem className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator className="bg-slate-200 dark:bg-slate-700" />
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        application.id,
-                                        "reviewed"
-                                      )
-                                    }
-                                    className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
+                                  <span className="flex items-center gap-1">
+                                    {getStatusIcon(application.status)}
+                                    {application.status
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                      application.status.slice(1)}
+                                  </span>
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-slate-900 dark:text-white">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                  {format(
+                                    new Date(application.createdAt),
+                                    "MMM d, yyyy"
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                    >
+                                      <span className="sr-only">Open menu</span>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-lg"
                                   >
-                                    <UserCheck className="mr-2 h-4 w-4" />
-                                    Mark as Reviewed
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        application.id,
-                                        "accepted"
-                                      )
-                                    }
-                                    className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
-                                  >
-                                    <Check className="mr-2 h-4 w-4" />
-                                    Accept Application
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        application.id,
-                                        "rejected"
-                                      )
-                                    }
-                                    className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
-                                  >
-                                    <UserX className="mr-2 h-4 w-4" />
-                                    Reject Application
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                    <DropdownMenuLabel className="text-slate-900 dark:text-white">
+                                      Actions
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-slate-200 dark:bg-slate-700" />
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          application.id,
+                                          "reviewed"
+                                        )
+                                      }
+                                      className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
+                                      disabled={
+                                        updatingApplicationId === application.id
+                                      }
+                                    >
+                                      {updatingApplicationId ===
+                                      application.id ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <UserCheck className="mr-2 h-4 w-4" />
+                                      )}
+                                      Mark as Reviewed
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          application.id,
+                                          "accepted"
+                                        )
+                                      }
+                                      className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700"
+                                      disabled={
+                                        updatingApplicationId === application.id
+                                      }
+                                    >
+                                      {updatingApplicationId ===
+                                      application.id ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Check className="mr-2 h-4 w-4" />
+                                      )}
+                                      Accept Application
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          application.id,
+                                          "rejected"
+                                        )
+                                      }
+                                      className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
+                                      disabled={
+                                        updatingApplicationId === application.id
+                                      }
+                                    >
+                                      {updatingApplicationId ===
+                                      application.id ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <UserX className="mr-2 h-4 w-4" />
+                                      )}
+                                      Reject Application
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       ) : (
                         <TableRow>
                           <TableCell
